@@ -1,0 +1,118 @@
+.product-details-page {
+    padding-top: var(--spacing-xl);
+    padding-bottom: var(--spacing-xl);
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xl);
+}
+
+.main-image {
+    width: 100%;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.product-header {
+    margin-bottom: var(--spacing-md);
+}
+
+.product-header h1 {
+    font-size: 2.5rem;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-main);
+}
+
+.expiry-badge {
+    display: inline-block;
+    background-color: var(--secondary);
+    color: white;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.price-block {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+}
+
+.current-price-lg {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.original-price-lg {
+    font-size: 1.5rem;
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.discount-tag {
+    background-color: #E8F5E9;
+    color: var(--primary);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+}
+
+.info-row {
+    display: flex;
+    margin-bottom: var(--spacing-sm);
+    font-size: 1.125rem;
+}
+
+.info-row .label {
+    width: 100px;
+    color: var(--text-muted);
+}
+
+.info-row .value {
+    font-weight: 500;
+}
+
+.description-block {
+    margin: var(--spacing-xl) 0;
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border);
+}
+
+.description-block h3 {
+    margin-bottom: var(--spacing-sm);
+}
+
+.description-block p {
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.action-buttons {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-md);
+}
+
+@media (max-width: 768px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    .product-header h1 {
+        font-size: 2rem;
+    }
+
+    .current-price-lg {
+        font-size: 2rem;
+    }
+
+    .action-buttons {
+        grid-template-columns: 1fr;
+    }
+}
