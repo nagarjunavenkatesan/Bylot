@@ -1,103 +1,97 @@
-import pg from 'pg';
+import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config({ path: 'bylot/server/.env' });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const { Pool } = pg;
-
-const config = {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    database: 'postgres', // Connect to default DB first to check/create 'bylot'
-};
+// Load env from server dir regardless of cwd
+dotenv.config({ path: path.join(__dirname, '.env') });
+if (!process.env.DB_HOST) {
+    dotenv.config({ path: path.join(__dirname, '..', 'bylot', 'server', '.env') });
+}
 
 async function setupDatabase() {
-    let pool = new Pool(config);
-
+    // Step 1: Connect without specifying a database so we can create it if needed
+    let connection;
     try {
-        console.log('Connecting to PostgreSQL...');
-        const client = await pool.connect();
+        console.log('Connecting to MySQL...');
+        connection = await mysql.createConnection({
+            host:     process.env.DB_HOST || 'localhost',
+            port:     process.env.DB_PORT || 3306,
+            user:     process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+        });
 
-        // 1. Create Database if not exists
-        const res = await client.query(`SELECT 1 FROM pg_database WHERE datname = '${process.env.DB_NAME}'`);
-        if (res.rowCount === 0) {
-            console.log(`Creating database '${process.env.DB_NAME}'...`);
-            await client.query(`CREATE DATABASE "${process.env.DB_NAME}"`);
-        } else {
-            console.log(`Database '${process.env.DB_NAME}' already exists.`);
-        }
-        client.release();
-        await pool.end();
+        // 1. Create database if not exists
+        await connection.execute(
+            `CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+        );
+        console.log(`Database '${process.env.DB_NAME}' ready.`);
+        await connection.end();
 
-        // 2. Connect to the new database
-        console.log(`Connecting to '${process.env.DB_NAME}'...`);
-        pool = new Pool({ ...config, database: process.env.DB_NAME });
-        const dbClient = await pool.connect();
+        // 2. Connect to the target database
+        connection = await mysql.createConnection({
+            host:     process.env.DB_HOST || 'localhost',
+            port:     process.env.DB_PORT || 3306,
+            user:     process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
+        });
 
-        // 3. Create Tables
+        // 3. Create tables
         console.log('Creating tables...');
 
         // Users Table
-        await dbClient.query(`
+        await connection.execute(`
             CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                email VARCHAR(100) UNIQUE NOT NULL,
-                password VARCHAR(255), -- Made nullable for Google Auth
-                phone VARCHAR(20),
-                google_id VARCHAR(255) UNIQUE, -- Added for Google Auth
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                name       VARCHAR(100)  NOT NULL,
+                email      VARCHAR(100)  UNIQUE NOT NULL,
+                password   VARCHAR(255)  NULL,
+                phone      VARCHAR(20)   NULL,
+                google_id  VARCHAR(255)  UNIQUE NULL,
+                created_at DATETIME      DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // Migration: Ensure existing table supports Google Auth
-        await dbClient.query('ALTER TABLE users ALTER COLUMN password DROP NOT NULL');
-        try {
-            await dbClient.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE');
-        } catch (e) {
-            // IF NOT EXISTS might not be supported in older PG, catch error
-            if (e.code !== '42701') console.log('Notice: google_id column might already exist');
-        }
-
         // Items Table
-        await dbClient.query(`
+        await connection.execute(`
             CREATE TABLE IF NOT EXISTS items (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                description TEXT,
-                price DECIMAL(10, 2) NOT NULL,
-                original_price DECIMAL(10, 2),
-                expiry_date DATE,
-                category VARCHAR(50),
-                location VARCHAR(255),
-                location_link TEXT,
-                latitude DECIMAL(10, 8),
-                longitude DECIMAL(11, 8),
-                image_url TEXT,
-                seller_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                id             INT AUTO_INCREMENT PRIMARY KEY,
+                name           VARCHAR(255)   NOT NULL,
+                description    TEXT           NULL,
+                price          DECIMAL(10, 2) NOT NULL,
+                original_price DECIMAL(10, 2) NULL,
+                expiry_date    DATE           NULL,
+                category       VARCHAR(50)    NULL,
+                location       VARCHAR(255)   NULL,
+                location_link  TEXT           NULL,
+                latitude       DECIMAL(10, 8) NULL,
+                longitude      DECIMAL(11, 8) NULL,
+                image_url      TEXT           NULL,
+                seller_id      INT            NULL,
+                created_at     DATETIME       DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         // Verification Codes Table
-        await dbClient.query(`
+        await connection.execute(`
             CREATE TABLE IF NOT EXISTS verification_codes (
-                id SERIAL PRIMARY KEY,
-                phone VARCHAR(20) NOT NULL,
-                code VARCHAR(10) NOT NULL,
-                expires_at TIMESTAMP NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                phone      VARCHAR(20)  NOT NULL,
+                code       VARCHAR(10)  NOT NULL,
+                expires_at DATETIME     NOT NULL,
+                created_at DATETIME     DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        console.log('Tables created successfully.');
-        dbClient.release();
+        console.log('✅ Tables created successfully.');
     } catch (err) {
-        console.error('Error setting up database:', err);
+        console.error('❌ Error setting up database:', err.message);
     } finally {
-        await pool.end();
+        if (connection) await connection.end();
     }
 }
 

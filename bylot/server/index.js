@@ -19,7 +19,7 @@ const port = process.env.PORT || 5000;
 // Configure Multer Storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, 'uploads/')); 
+        cb(null, path.join(__dirname, 'uploads/'));
     },
     filename: (req, file, cb) => {
         cb(null, Date.now() + path.extname(file.originalname));
@@ -42,7 +42,7 @@ app.post('/api/register', async (req, res) => {
 
     try {
         // Check if user exists
-        const userCheck = await query('SELECT * FROM users WHERE email = $1', [email]);
+        const userCheck = await query('SELECT * FROM users WHERE email = ?', [email]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ message: 'User already exists' });
         }
@@ -51,12 +51,13 @@ app.post('/api/register', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Insert user
-        const newUser = await query(
-            'INSERT INTO users (name, email, password, phone) VALUES ($1, $2, $3, $4) RETURNING id, name, email, phone',
+        // Insert user (MySQL doesn't support RETURNING, fetch separately)
+        const result = await query(
+            'INSERT INTO users (name, email, password, phone) VALUES (?, ?, ?, ?)',
             [name, email, hashedPassword, phone]
         );
 
+        const newUser = await query('SELECT id, name, email, phone FROM users WHERE id = ?', [result.insertId]);
         res.status(201).json({ message: 'User registered successfully', user: newUser.rows[0] });
     } catch (err) {
         console.error(err);
@@ -71,12 +72,14 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60000); // 10 minutes from now
+    // MySQL DATETIME format
+    const expiresAtStr = expiresAt.toISOString().slice(0, 19).replace('T', ' ');
 
     try {
         // Store OTP in DB
         await query(
-            'INSERT INTO verification_codes (phone, code, expires_at) VALUES ($1, $2, $3)',
-            [phone, otp, expiresAt]
+            'INSERT INTO verification_codes (phone, code, expires_at) VALUES (?, ?, ?)',
+            [phone, otp, expiresAtStr]
         );
 
         console.log(`[MOCK SMS] OTP for ${phone}: ${otp}`); // Mock sending SMS
@@ -97,7 +100,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 
     try {
         const result = await query(
-            'SELECT * FROM verification_codes WHERE phone = $1 AND code = $2 AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
+            'SELECT * FROM verification_codes WHERE phone = ? AND code = ? AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1',
             [phone, otp]
         );
 
@@ -123,31 +126,31 @@ app.post('/api/auth/google', async (req, res) => {
         const { name, email, sub: googleId, picture } = ticket.getPayload();
 
         // Check if user exists
-        let userResult = await query('SELECT * FROM users WHERE email = $1', [email]);
-        
+        let userResult = await query('SELECT * FROM users WHERE email = ?', [email]);
+
         if (userResult.rows.length === 0) {
             // Create new Google user
-            userResult = await query(
-                'INSERT INTO users (name, email, google_id) VALUES ($1, $2, $3) RETURNING *',
+            const ins = await query(
+                'INSERT INTO users (name, email, google_id) VALUES (?, ?, ?)',
                 [name, email, googleId]
             );
+            userResult = await query('SELECT * FROM users WHERE id = ?', [ins.insertId]);
         } else {
             // Update google_id if missing (linking account)
             if (!userResult.rows[0].google_id) {
-                await query('UPDATE users SET google_id = $1 WHERE email = $2', [googleId, email]);
+                await query('UPDATE users SET google_id = ? WHERE email = ?', [googleId, email]);
             }
         }
 
         const user = userResult.rows[0];
-        // Ensure id is returned as number for frontend checks
-        res.json({ 
-            message: 'Login successful', 
-            user: { 
-                id: user.id, 
-                name: user.name, 
+        res.json({
+            message: 'Login successful',
+            user: {
+                id: user.id,
+                name: user.name,
                 email: user.email,
-                avatar: picture 
-            } 
+                avatar: picture
+            }
         });
 
     } catch (err) {
@@ -162,7 +165,7 @@ app.post('/api/login', async (req, res) => {
 
     try {
         // Check if user exists
-        const userResult = await query('SELECT * FROM users WHERE email = $1', [email]);
+        const userResult = await query('SELECT * FROM users WHERE email = ?', [email]);
         if (userResult.rows.length === 0) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
@@ -193,19 +196,17 @@ app.post('/api/items', upload.single('image'), async (req, res) => {
     let imageUrl = req.body.imageUrl; // Keep fallback if provided
 
     if (req.file) {
-        // Assuming the server is accessed via proxy /api, but images via /uploads
-        // We need to return a path relative to the domain root or full URL
-        // Since we serve static /uploads, the path is /uploads/filename
         imageUrl = `/uploads/${req.file.filename}`;
     }
 
     try {
-        const newItem = await query(
+        const result = await query(
             `INSERT INTO items (name, description, price, original_price, expiry_date, category, location, location_link, latitude, longitude, seller_id, image_url)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-             RETURNING *`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [name, description, price, originalPrice, expiryDate, category, location, locationLink, latitude, longitude, sellerId, imageUrl]
         );
+
+        const newItem = await query('SELECT * FROM items WHERE id = ?', [result.insertId]);
         res.status(201).json({ message: 'Item created successfully', item: newItem.rows[0] });
     } catch (err) {
         console.error(err);
@@ -220,23 +221,23 @@ app.get('/api/items', async (req, res) => {
     try {
         let items;
         if (lat && lng) {
-            // Haversine formula for distance
+            // Haversine formula — same SQL works in MySQL
             const queryText = `
                 SELECT *,
                 (
                     6371 * acos(
-                        cos(radians($1)) * cos(radians(latitude)) * cos(radians(longitude) - radians($2)) +
-                        sin(radians($1)) * sin(radians(latitude))
+                        cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) +
+                        sin(radians(?)) * sin(radians(latitude))
                     )
                 ) AS distance
                 FROM items
                 ORDER BY distance ASC
             `;
-            items = await query(queryText, [lat, lng]);
+            items = await query(queryText, [lat, lng, lat]);
         } else if (req.query.sellerId) {
-             items = await query('SELECT * FROM items WHERE seller_id = $1 ORDER BY created_at DESC', [req.query.sellerId]);
+            items = await query('SELECT * FROM items WHERE seller_id = ? ORDER BY created_at DESC', [req.query.sellerId]);
         } else {
-             items = await query('SELECT * FROM items ORDER BY created_at DESC');
+            items = await query('SELECT * FROM items ORDER BY created_at DESC');
         }
         res.json(items.rows);
     } catch (err) {
@@ -249,7 +250,10 @@ app.get('/api/items', async (req, res) => {
 app.get('/api/items/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const item = await query('SELECT items.*, users.name as seller_name FROM items JOIN users ON items.seller_id = users.id WHERE items.id = $1', [id]);
+        const item = await query(
+            'SELECT items.*, users.name as seller_name FROM items JOIN users ON items.seller_id = users.id WHERE items.id = ?',
+            [id]
+        );
         if (item.rows.length === 0) {
             return res.status(404).json({ message: 'Item not found' });
         }
@@ -264,7 +268,7 @@ app.get('/api/items/:id', async (req, res) => {
 app.get('/api/users/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await query('SELECT id, name, email, phone, created_at FROM users WHERE id = $1', [id]);
+        const result = await query('SELECT id, name, email, phone, created_at FROM users WHERE id = ?', [id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -282,13 +286,14 @@ app.put('/api/items/:id', async (req, res) => {
 
     try {
         const result = await query(
-            'UPDATE items SET name=$1, description=$2, price=$3, original_price=$4, expiry_date=$5, category=$6, location=$7, location_link=$8, image_url=$9 WHERE id=$10',
+            'UPDATE items SET name=?, description=?, price=?, original_price=?, expiry_date=?, category=?, location=?, location_link=?, image_url=? WHERE id=?',
             [name, description, price, originalPrice, expiryDate, category, location, locationLink, imageUrl, id]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ message: 'Item not found' });
         }
-        res.json({ message: 'Item updated successfully', item: result.rows[0] });
+        const updated = await query('SELECT * FROM items WHERE id = ?', [id]);
+        res.json({ message: 'Item updated successfully', item: updated.rows[0] });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
@@ -301,14 +306,12 @@ app.put('/api/users/:id', async (req, res) => {
     const { phone } = req.body;
 
     try {
-        const result = await query(
-            'UPDATE users SET phone = $1 WHERE id = $2 RETURNING id, name, email, phone, google_id, created_at',
-            [phone, id]
-        );
-        if (result.rows.length === 0) {
+        const result = await query('UPDATE users SET phone = ? WHERE id = ?', [phone, id]);
+        if (result.rowCount === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
-        res.json({ message: 'User updated successfully', user: result.rows[0] });
+        const updated = await query('SELECT id, name, email, phone, google_id, created_at FROM users WHERE id = ?', [id]);
+        res.json({ message: 'User updated successfully', user: updated.rows[0] });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
@@ -320,7 +323,7 @@ app.delete('/api/items/:id', async (req, res) => {
     const { id } = req.params;
     console.log(`[DELETE] Request for item ID: ${id}`);
     try {
-        const result = await query('DELETE FROM items WHERE id = $1', [id]);
+        const result = await query('DELETE FROM items WHERE id = ?', [id]);
         if (result.rowCount === 0) {
             console.log(`[DELETE] Item ${id} not found`);
             return res.status(404).json({ message: 'Item not found' });

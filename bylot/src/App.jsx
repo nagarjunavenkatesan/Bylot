@@ -22,7 +22,6 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
-    // Simulate initial loading
     const timer = setTimeout(() => {
       setLoading(false);
     }, 2000);
