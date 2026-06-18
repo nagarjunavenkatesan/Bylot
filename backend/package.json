@@ -1,0 +1,40 @@
+{
+  "name": "bylot-backend",
+  "version": "1.0.0",
+  "description": "Centralized Express/MySQL backend API for Bylot Android, website, and admin panel.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "schema": "node scripts/runSchema.js",
+    "create-admin": "node scripts/createAdmin.js",
+    "lint": "node --check app.js && node --check server.js"
+  },
+  "keywords": [
+    "bylot",
+    "marketplace",
+    "express",
+    "mysql"
+  ],
+  "author": "Bylot",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.11.5",
+    "nodemailer": "^6.9.16",
+    "uuid": "^11.0.3",
+    "google-auth-library": "^9.15.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

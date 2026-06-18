@@ -1,0 +1,57 @@
+/* Card specific component styles */
+
+.card-tilt-wrapper {
+    display: flex;
+    transform-style: preserve-3d;
+    background: transparent;
+    border: none;
+    width: 100%;
+}
+
+.card-inner-3d {
+    transform: translateZ(30px);
+    background: var(--bg-surface);
+    backdrop-filter: var(--blur-lg);
+    -webkit-backdrop-filter: var(--blur-lg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: var(--shadow-md);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    transition: all 0.3s ease;
+    width: 100%;
+    transform-style: preserve-3d;
+}
+
+body.dark-mode .card-inner-3d {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.card-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    color: var(--text-main);
+    transform: translateZ(40px);
+}
+
+.card-subtitle {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: var(--spacing-md);
+    transform: translateZ(35px);
+}
+
+.card-image {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+    transform: translateZ(50px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Also give inner buttons and elements a 3D pop */
+.card-inner-3d .btn {
+    transform: translateZ(40px);
+}

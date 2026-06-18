@@ -1,0 +1,46 @@
+/* Advanced Button Variants extending index.css .btn */
+
+.btn-lg {
+    padding: 1rem 2.5rem;
+    font-size: 1.125rem;
+    border-radius: var(--radius-full);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.btn-outline::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 0; height: 100%;
+    background: var(--primary);
+    z-index: -1;
+    transition: width var(--transition-normal);
+}
+
+.btn-outline:hover {
+    color: white;
+    border-color: var(--primary);
+}
+
+.btn-outline:hover::before {
+    width: 100%;
+}
+
+.btn-danger {
+    background: var(--secondary);
+    color: white;
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(236, 72, 153, 0.5);
+    background: var(--secondary-light);
+}

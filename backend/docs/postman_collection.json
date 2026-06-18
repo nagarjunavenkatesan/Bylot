@@ -1,0 +1,159 @@
+{
+  "info": {
+    "name": "Bylot Backend API",
+    "description": "Sample Postman collection for the centralized Bylot backend used by Android, website, and admin panel.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "adminAccessToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth - Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/auth/register",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Demo User\",\"email\":\"demo@example.com\",\"password\":\"Password123\",\"role\":\"customer\"}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"demo@example.com\",\"password\":\"Password123\"}"
+        }
+      }
+    },
+    {
+      "name": "Products - All",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products?page=1&limit=20"
+      }
+    },
+    {
+      "name": "Products - Nearby",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/products/nearby?latitude=12.9716&longitude=77.5946&radiusKm=10"
+      }
+    },
+    {
+      "name": "User - Profile",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/users/profile"
+      }
+    },
+    {
+      "name": "Seller - Create Profile",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/sellers/profile",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"businessName\":\"Demo Store\",\"businessType\":\"mixed\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"postalCode\":\"560001\",\"latitude\":12.9716,\"longitude\":77.5946}"
+        }
+      }
+    },
+    {
+      "name": "Seller - Add Product",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/sellers/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"categoryId\":1,\"name\":\"Discount Rice Pack\",\"mrp\":250,\"sellingPrice\":199,\"stockQuantity\":50,\"productType\":\"discount\"}"
+        }
+      }
+    },
+    {
+      "name": "Orders - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/orders",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"sellerId\":1,\"items\":[{\"productId\":1,\"quantity\":2}]}"
+        }
+      }
+    },
+    {
+      "name": "Payments - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/payments",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"orderId\":1}"
+        }
+      }
+    },
+    {
+      "name": "Admin - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/api/admin/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@bylot.com\",\"password\":\"Password123\"}"
+        }
+      }
+    },
+    {
+      "name": "Admin - Dashboard",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+        ],
+        "url": "{{baseUrl}}/api/admin/dashboard"
+      }
+    }
+  ]
+}
