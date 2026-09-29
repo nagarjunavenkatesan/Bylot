@@ -180,15 +180,32 @@ const resolveReport = asyncHandler(async (req, res) => {
 const districtAnalytics = asyncHandler(async (req, res) => {
   const [rows] = await pool.execute(`
     SELECT
-      COALESCE(s.city, 'Unknown') AS district,
-      COUNT(DISTINCT p.id)        AS sellCount,
-      COALESCE(SUM(p.selling_price), 0) AS sellValue,
-      COUNT(DISTINCT o.id)        AS buyCount,
-      COALESCE(SUM(o.grand_total), 0)   AS buyValue
-    FROM sellers s
-    LEFT JOIN products p ON p.seller_id = s.id AND p.status = 'active'
-    LEFT JOIN orders   o ON o.seller_id = s.id
-    GROUP BY COALESCE(s.city, 'Unknown')
+      cities.district,
+      COALESCE(prod.sellCount, 0) AS sellCount,
+      COALESCE(prod.sellValue, 0) AS sellValue,
+      COALESCE(ord.buyCount, 0)   AS buyCount,
+      COALESCE(ord.buyValue, 0)   AS buyValue
+    FROM (
+      SELECT DISTINCT COALESCE(city, 'Unknown') AS district FROM sellers
+    ) cities
+    LEFT JOIN (
+      SELECT
+        COALESCE(s.city, 'Unknown') AS district,
+        COUNT(p.id) AS sellCount,
+        COALESCE(SUM(p.selling_price), 0) AS sellValue
+      FROM sellers s
+      JOIN products p ON p.seller_id = s.id AND p.status = 'active'
+      GROUP BY COALESCE(s.city, 'Unknown')
+    ) prod ON prod.district = cities.district
+    LEFT JOIN (
+      SELECT
+        COALESCE(s.city, 'Unknown') AS district,
+        COUNT(o.id) AS buyCount,
+        COALESCE(SUM(o.grand_total), 0) AS buyValue
+      FROM sellers s
+      JOIN orders o ON o.seller_id = s.id
+      GROUP BY COALESCE(s.city, 'Unknown')
+    ) ord ON ord.district = cities.district
     ORDER BY sellCount DESC
     LIMIT 30
   `);

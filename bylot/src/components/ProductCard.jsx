@@ -67,6 +67,8 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
                         src={product.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'}
                         alt={product.name || 'Product'}
                         className="card-image"
+                        loading="lazy"
+                        decoding="async"
                         onError={e => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'; }}
                     />
                     <span className="expiry-tag">Expires: {product.expiry || 'N/A'}</span>
@@ -185,4 +187,4 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
     );
 };
 
-export default ProductCard;
+export default React.memo(ProductCard);

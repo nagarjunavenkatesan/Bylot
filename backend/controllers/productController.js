@@ -95,10 +95,21 @@ const nearbyProducts = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
   const lat = Number(req.query.latitude);
   const lng = Number(req.query.longitude);
-  const radiusKm = Number(req.query.radiusKm || 10);
+  const radiusKm = Math.min(Math.max(Number(req.query.radiusKm || 10), 1), 200);
+
+  // Fast bounding-box optimization: uses idx_sellers_location (latitude, longitude)
+  const latDelta = radiusKm / 111.0;
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+  const lonDelta = radiusKm / (111.0 * Math.max(Math.abs(cosLat), 0.01));
+  const minLat = lat - latDelta;
+  const maxLat = lat + latDelta;
+  const minLng = lng - lonDelta;
+  const maxLng = lng + lonDelta;
+
   const distanceSql = "(6371 * ACOS(COS(RADIANS(?)) * COS(RADIANS(s.latitude)) * COS(RADIANS(s.longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(s.latitude))))";
-  const baseWhere = "p.status = 'active' AND s.latitude IS NOT NULL AND s.longitude IS NOT NULL";
-  const distanceParams = [lat, lng, lat, radiusKm];
+  const baseWhere = "p.status = 'active' AND s.latitude BETWEEN ? AND ? AND s.longitude BETWEEN ? AND ?";
+  const countParams = [minLat, maxLat, minLng, maxLng, lat, lng, lat, radiusKm];
+  const selectParams = [minLat, maxLat, minLng, maxLng, lat, lng, lat, radiusKm, limit, offset];
 
   const [countRows] = await pool.query(
     `SELECT COUNT(*) AS total FROM (
@@ -107,7 +118,7 @@ const nearbyProducts = asyncHandler(async (req, res) => {
        WHERE ${baseWhere}
        HAVING distance_km <= ?
      ) nearby`,
-    distanceParams
+    countParams
   );
 
   const [rows] = await pool.query(
@@ -119,7 +130,7 @@ const nearbyProducts = asyncHandler(async (req, res) => {
      HAVING distance_km <= ?
      ORDER BY distance_km ASC
      LIMIT ? OFFSET ?`,
-    [...distanceParams, limit, offset]
+    selectParams
   );
 
   return success(res, "Nearby products fetched successfully", rows, 200, buildMeta(countRows[0]?.total || rows.length, page, limit));

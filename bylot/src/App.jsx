@@ -1,20 +1,22 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, lazy, Suspense } from 'react'
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
-import Browse from './pages/Browse'
-import Sell from './pages/Sell'
-import ProductDetails from './pages/ProductDetails'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import SellerDetails from './pages/SellerDetails'
-import Profile from './pages/Profile'
-import EditItem from './pages/EditItem'
-import AdminPanel from './pages/AdminPanel'
 import Loader from './components/Loader'
 import AIAssistant from './components/AIAssistant'
 import { LocationProvider } from './context/LocationContext'
 import { useAuth } from './context/AuthContext'
+
+// Route-level code splitting: load secondary pages on-demand to shrink initial bundle
+const Browse = lazy(() => import('./pages/Browse'))
+const Sell = lazy(() => import('./pages/Sell'))
+const ProductDetails = lazy(() => import('./pages/ProductDetails'))
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const SellerDetails = lazy(() => import('./pages/SellerDetails'))
+const Profile = lazy(() => import('./pages/Profile'))
+const EditItem = lazy(() => import('./pages/EditItem'))
+const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 
 function AdminRoute({ children }) {
   const { user } = useAuth();
@@ -25,7 +27,6 @@ function AdminRoute({ children }) {
 
 function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('bylot-theme') || 'light');
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     document.body.className = theme === 'dark' ? 'dark-mode' : '';
@@ -33,39 +34,34 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    // Generate handshake key immediately without blocking render
     if (!localStorage.getItem('bylot-handshake')) {
       localStorage.setItem('bylot-handshake', Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
     }
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 2000);
-    return () => clearTimeout(timer);
   }, []);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  if (loading) {
-    return <Loader />;
-  }
-
   return (
     <Router>
       <LocationProvider>
         <Layout theme={theme} toggleTheme={toggleTheme}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/browse" element={<Browse />} />
-            <Route path="/sell" element={<Sell />} />
-            <Route path="/product/:id" element={<ProductDetails />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/seller/:id" element={<SellerDetails />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/edit-item/:id" element={<EditItem />} />
-            <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
-          </Routes>
+          <Suspense fallback={<Loader />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/browse" element={<Browse />} />
+              <Route path="/sell" element={<Sell />} />
+              <Route path="/product/:id" element={<ProductDetails />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/seller/:id" element={<SellerDetails />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/edit-item/:id" element={<EditItem />} />
+              <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
+            </Routes>
+          </Suspense>
           <AIAssistant />
         </Layout>
       </LocationProvider>

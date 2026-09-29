@@ -244,29 +244,66 @@ export function normalizeProduct(product) {
     };
 }
 
+// ---------- high-performance memory cache ----------
+const apiCache = new Map();
+const CACHE_TTL_MS = 45 * 1000; // 45s TTL for snappy navigation
+
+export function clearApiCache() {
+    apiCache.clear();
+}
+
+function getCached(key) {
+    const entry = apiCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.time > CACHE_TTL_MS) {
+        apiCache.delete(key);
+        return null;
+    }
+    return entry.data;
+}
+
+function setCached(key, data) {
+    if (apiCache.size >= 80) {
+        const oldest = apiCache.keys().next().value;
+        apiCache.delete(oldest);
+    }
+    apiCache.set(key, { time: Date.now(), data });
+}
+
 // ---------- products ----------
 export async function fetchProducts(params = {}) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            searchParams.set(key, value);
+        }
+    });
+    const query = searchParams.toString();
+    const cacheKey = `products_${query}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     try {
-        const searchParams = new URLSearchParams();
-        Object.entries(params).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-                searchParams.set(key, value);
-            }
-        });
-        const query = searchParams.toString();
         const response = await apiRequest(`/api/products${query ? `?${query}` : ''}`);
         const data = response?.data ?? response;
         if (Array.isArray(data)) {
-            return data.map(normalizeProduct).filter(Boolean);
+            const normalized = data.map(normalizeProduct).filter(Boolean);
+            setCached(cacheKey, normalized);
+            return normalized;
         }
     } catch (err) {
         console.warn('Backend API request failed, using sample product dataset fallback:', err.message);
     }
     // Fallback to sample items
-    return SAMPLE_PRODUCTS.map(normalizeProduct).filter(Boolean);
+    const fallback = SAMPLE_PRODUCTS.map(normalizeProduct).filter(Boolean);
+    return fallback;
 }
 
 export async function fetchNearbyProducts(lat, lng, radius = 10) {
+    const cacheKey = `nearby_${Number(lat).toFixed(3)}_${Number(lng).toFixed(3)}_${radius}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     try {
         const params = new URLSearchParams({
             latitude: lat,
@@ -277,7 +314,9 @@ export async function fetchNearbyProducts(lat, lng, radius = 10) {
         const response = await apiRequest(`/api/products/nearby?${params}`);
         const data = response?.data ?? response;
         if (Array.isArray(data) && data.length > 0) {
-            return data.map(normalizeProduct);
+            const normalized = data.map(normalizeProduct);
+            setCached(cacheKey, normalized);
+            return normalized;
         }
     } catch (err) {
         console.warn('Nearby products request failed, calculating fallback distances:', err.message);
@@ -288,11 +327,17 @@ export async function fetchNearbyProducts(lat, lng, radius = 10) {
 }
 
 export async function fetchProductById(id) {
+    const cacheKey = `product_${id}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     try {
         const response = await apiRequest(`/api/products/${id}`);
         const product = response?.data ?? response;
         if (product && product.id) {
-            return normalizeProduct(product);
+            const normalized = normalizeProduct(product);
+            setCached(cacheKey, normalized);
+            return normalized;
         }
     } catch (err) {
         console.warn(`Product ID ${id} request failed, looking up fallback:`, err.message);
@@ -304,18 +349,22 @@ export async function fetchProductById(id) {
 
 // ---------- admin ----------
 export async function adminDeleteProduct(id) {
+    clearApiCache();
     return apiRequest(`/api/admin/products/${id}`, { method: 'DELETE' });
 }
 
 // ---------- seller ----------
 export async function deleteProduct(id) {
+    clearApiCache();
     return apiRequest(`/api/sellers/products/${id}`, { method: 'DELETE' });
 }
 
 export async function uploadProduct(formData) {
+    clearApiCache();
     return apiRequest('/api/sellers/products', {
         method: 'POST',
         body: formData,
     });
 }
+
 

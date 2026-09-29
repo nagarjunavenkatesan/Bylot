@@ -1,4 +1,5 @@
 const express = require("express");
+const compression = require("compression");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -71,13 +72,26 @@ app.use(csrfProtection);
 // Traffic monitor — auto-detects spikes and protects the site
 app.use(trafficMonitor);
 
-app.use("/uploads", express.static(path.resolve(process.cwd(), env.uploadDir)));
+// HTTP Compression (gzip / deflate) for API and asset responses
+app.use(compression({
+  threshold: 1024, // only compress responses above 1KB
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) return false;
+    return compression.filter(req, res);
+  }
+}));
+
+app.use("/uploads", express.static(path.resolve(process.cwd(), env.uploadDir), {
+  maxAge: "7d",
+  etag: true
+}));
 
 app.get("/health", (req, res) => {
   res.json({ success: true, message: "Bylot API is healthy", data: { uptime: process.uptime() } });
 });
 
 app.get("/api/config", (req, res) => {
+  res.set("Cache-Control", "public, max-age=300");
   res.json({
     success: true,
     data: {
@@ -99,10 +113,19 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/security", securityRoutes);
 app.use("/mcp", mcpRoutes);
 
-// Serve built React frontend in production
+// Serve built React frontend in production with caching
 const frontendDist = path.resolve(__dirname, "..", "bylot", "dist");
 if (fs.existsSync(frontendDist)) {
-  app.use(express.static(frontendDist));
+  app.use(express.static(frontendDist, {
+    maxAge: "1d",
+    etag: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith(".html")) {
+        // Never cache HTML so users always get fresh asset links
+        res.setHeader("Cache-Control", "no-cache");
+      }
+    }
+  }));
   app.get("*", (req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) return next();
     res.sendFile(path.join(frontendDist, "index.html"));
