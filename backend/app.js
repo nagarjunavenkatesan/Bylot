@@ -6,7 +6,8 @@ const path = require("path");
 const fs = require("fs");
 const env = require("./config/env");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
-const { ghostField, handshake, mirror } = require("./middleware/strangeFirewall");
+const { ghostField, sigil, handshake, mirage, mirror, threshold, blocklist } = require("./middleware/strangeFirewall");
+const { trafficMonitor } = require("./middleware/trafficMonitor");
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -17,36 +18,58 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const securityRoutes = require("./routes/securityRoutes");
+const mcpRoutes = require("./routes/mcpRoutes");
+const { inputSanitizerMiddleware } = require("./security/inputSanitizer");
+const { csrfProtection } = require("./security/csrfProtection");
 
 const app = express();
 
 app.set("trust proxy", 1);
-app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" }, contentSecurityPolicy: false }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false,
+  xFrameOptions: { action: "deny" },
+  xContentTypeOptions: true,
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" }
+}));
+
 function isLocalDevOrigin(origin) {
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  return /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/i.test(origin);
 }
 app.use(cors({
   origin(origin, callback) {
     if (!origin || env.corsOrigins.length === 0 || env.corsOrigins.includes(origin)) {
       return callback(null, true);
     }
-    if (env.nodeEnv !== "production" && isLocalDevOrigin(origin)) {
+    if (isLocalDevOrigin(origin)) {
       return callback(null, true);
     }
     return callback(new Error(`Origin not allowed by CORS: ${origin}`));
   },
   credentials: true,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-Bylot-Handshake", "X-CSRF-Token"]
 }));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(inputSanitizerMiddleware);
 app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
-// The Strange Firewall — three layers of unconventional security
+// The Strange Firewall — seven layers of unconventional security
+app.use(blocklist);
 app.use(ghostField);
+app.use(sigil);
+app.use(mirage);
 app.use(handshake);
 app.use(mirror);
+app.use(threshold);
+
+// CSRF Protection on mutating routes
+app.use(csrfProtection);
+
+// Traffic monitor — auto-detects spikes and protects the site
+app.use(trafficMonitor);
 
 app.use("/uploads", express.static(path.resolve(process.cwd(), env.uploadDir)));
 
@@ -73,6 +96,8 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/security", securityRoutes);
+app.use("/mcp", mcpRoutes);
 
 // Serve built React frontend in production
 const frontendDist = path.resolve(__dirname, "..", "bylot", "dist");

@@ -1,6 +1,5 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import Button from '../components/Button';
 import PageTransition from '../components/PageTransition';
 import { fetchProductById, deleteProduct, adminDeleteProduct, apiRequest } from '../api/backendApi';
@@ -14,7 +13,13 @@ const ProductDetails = () => {
 
     React.useEffect(() => {
         const userStr = localStorage.getItem('user');
-        if (userStr) setCurrentUser(JSON.parse(userStr));
+        if (userStr) {
+            try {
+                setCurrentUser(JSON.parse(userStr));
+            } catch (_) {
+                localStorage.removeItem('user');
+            }
+        }
 
         fetchProductById(id)
             .then(setProduct)
@@ -35,8 +40,8 @@ const ProductDetails = () => {
             await apiRequest('/api/orders', {
                 method: 'POST',
                 body: JSON.stringify({
-                    sellerId: product.seller_id,
-                    items: [{ productId: Number(id), quantity: 1 }]
+                    sellerId: Number(product.seller_id || product.sellerId || 1),
+                    items: [{ productId: Number(id), quantity: 1 }],
                 }),
             });
             alert('Purchase recorded successfully!');
@@ -60,23 +65,34 @@ const ProductDetails = () => {
     const handleShare = async () => {
         if (navigator.share) {
             try { await navigator.share({ title: product.name, text: `Check out ${product.name} on Bylot!`, url: window.location.href }); }
-            catch (_) {}
+            catch (err) {
+                console.error('Share failed:', err);
+            }
         } else {
-            navigator.clipboard.writeText(window.location.href);
-            alert('Link copied to clipboard!');
+            try {
+                await navigator.clipboard.writeText(window.location.href);
+                alert('Link copied to clipboard!');
+            } catch (err) {
+                console.error('Clipboard write failed:', err);
+            }
         }
     };
 
     return (
         <PageTransition>
             <div className="product-details-page container">
-                <motion.div className="details-grid" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
+                <div className="details-grid">
                     <div className="product-image-section">
                         <img src={product.image || 'https://via.placeholder.com/400'} alt={product.name} className="main-image" />
                     </div>
                     <div className="product-info-section">
                         <div className="product-header">
-                            <h1>{product.name}</h1>
+                            <div>
+                                <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--primary)', background: 'rgba(99, 102, 241, 0.14)', padding: '3px 10px', borderRadius: '8px', display: 'inline-block', marginBottom: '0.5rem' }}>
+                                    Item ID: {product.product_item_id || `#${product.id}`}
+                                </span>
+                                <h1>{product.name}</h1>
+                            </div>
                             <span className="expiry-badge">Expires: {product.expiry}</span>
                         </div>
                         <div className="price-block">
@@ -87,6 +103,10 @@ const ProductDetails = () => {
                                     <span className="discount-tag">Save ₹{(Number(product.originalPrice) - Number(product.price)).toFixed(0)}</span>
                                 </>
                             )}
+                        </div>
+                        <div className="info-row">
+                            <span className="label">Item ID:</span>
+                            <span className="value" style={{ fontWeight: '800', color: 'var(--primary)' }}>{product.product_item_id || `#${product.id}`}</span>
                         </div>
                         <div className="info-row">
                             <span className="label">Location:</span>
@@ -115,7 +135,7 @@ const ProductDetails = () => {
                             <Button variant="outline" size="lg" className="w-full" onClick={handleShare}>Share</Button>
                         </div>
                     </div>
-                </motion.div>
+                </div>
             </div>
         </PageTransition>
     );

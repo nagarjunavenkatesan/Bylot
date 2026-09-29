@@ -26,9 +26,10 @@ const Header = ({ theme, toggleTheme }) => {
 
                 <nav className={`nav ${isMenuOpen ? 'nav-open' : ''}`}>
                     <Link to="/" className="nav-link" onClick={() => setIsMenuOpen(false)}>Home</Link>
-                    <Link to="/browse" className="nav-link" onClick={() => setIsMenuOpen(false)}>Browse</Link>
-                    <Link to="/sell" className="nav-link" onClick={() => setIsMenuOpen(false)}>Sell</Link>
-                    <Link to="/admin" className="nav-link" onClick={() => setIsMenuOpen(false)}>Admin</Link>
+                    <Link to={user ? "/sell" : "/login"} className="nav-link" onClick={() => setIsMenuOpen(false)}>Sell</Link>
+                    <div className="google-skill-chip green" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', cursor: 'pointer' }}>
+                        🌱 Bylot Eco Level
+                    </div>
                     <button onClick={toggleTheme} className="theme-toggle" aria-label="Toggle Theme">
                         {theme === 'light' ? '🌙' : '☀️'}
                     </button>

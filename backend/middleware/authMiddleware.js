@@ -1,6 +1,7 @@
 const { pool } = require("../config/db");
 const AppError = require("../utils/AppError");
 const { verifyAccessToken } = require("../utils/token");
+const tokenBlacklist = require("../security/tokenBlacklist");
 
 async function authenticate(req, res, next) {
   try {
@@ -9,6 +10,10 @@ async function authenticate(req, res, next) {
 
     if (!token) {
       throw new AppError("Please sign in to continue.", 401);
+    }
+
+    if (tokenBlacklist.isBlacklisted(token)) {
+      throw new AppError("Session revoked. Please sign in again.", 401);
     }
 
     const payload = verifyAccessToken(token);
@@ -23,6 +28,7 @@ async function authenticate(req, res, next) {
     }
 
     req.user = user;
+    req.token = token;
     next();
   } catch (err) {
     next(err.name === "JsonWebTokenError" || err.name === "TokenExpiredError"

@@ -20,13 +20,25 @@ function discountPercent(mrp, sellingPrice) {
   return Math.max(0, Number((((mrp - sellingPrice) / mrp) * 100).toFixed(2)));
 }
 
-function generateProductItemId() {
+async function generateProductItemId() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let id = 'PRD-';
-  for (let i = 0; i < 6; i++) {
-    id += chars[Math.floor(Math.random() * chars.length)];
+  let isUnique = false;
+  let productItemId = '';
+  while (!isUnique) {
+    let id = 'PRD-';
+    for (let i = 0; i < 6; i++) {
+      id += chars[Math.floor(Math.random() * chars.length)];
+    }
+    const [existing] = await pool.execute(
+      'SELECT id FROM products WHERE product_item_id = ? LIMIT 1',
+      [id]
+    );
+    if (!existing || existing.length === 0) {
+      productItemId = id;
+      isUnique = true;
+    }
   }
-  return id;
+  return productItemId;
 }
 
 const addProduct = asyncHandler(async (req, res) => {
@@ -34,13 +46,13 @@ const addProduct = asyncHandler(async (req, res) => {
   const body = req.body;
   const slug = `${slugify(body.name)}-${Date.now()}`;
   const discount = discountPercent(body.mrp, body.sellingPrice);
-  const productItemId = generateProductItemId();
+  const productItemId = await generateProductItemId();
 
   const [result] = await pool.execute(
     `INSERT INTO products
      (product_item_id, seller_id, category_id, name, slug, description, sku, brand, mrp, selling_price, discount_percent,
       stock_quantity, low_stock_threshold, expiry_date, manufacture_date, batch_number, product_type, image_url, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       productItemId,
       seller.id,

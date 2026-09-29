@@ -1,0 +1,370 @@
+/* Bylot Unique Skill System & Micro Animations */
+
+:root {
+  /* Bylot Signature Brand Tokens */
+  --bylot-indigo: #4F46E5;
+  --bylot-pink: #EC4899;
+  --bylot-emerald: #10B981;
+  --bylot-amber: #F59E0B;
+  --bylot-purple: #8B5CF6;
+
+  --bylot-gradient-multi: linear-gradient(135deg, #4F46E5 0%, #EC4899 50%, #10B981 100%);
+  --bylot-gradient-glow: linear-gradient(90deg, #4F46E5, #8B5CF6, #EC4899, #10B981, #4F46E5);
+  --bylot-gradient-mesh: radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.22) 0px, transparent 50%),
+                         radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.18) 0px, transparent 50%),
+                         radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.22) 0px, transparent 50%),
+                         radial-gradient(at 0% 100%, rgba(245, 158, 11, 0.18) 0px, transparent 50%);
+}
+
+/* Animated Flowing Mesh Background */
+.bylot-mesh-bg {
+  position: absolute;
+  inset: 0;
+  background-image: var(--bylot-gradient-mesh);
+  background-size: 200% 200%;
+  animation: bylotMeshFlow 14s ease infinite;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.8;
+}
+
+@keyframes bylotMeshFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Floating Orbits & Geometry */
+.google-orbit-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.google-shape {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(22px);
+  opacity: 0.35;
+  animation: bylotFloat 9s ease-in-out infinite alternate;
+}
+
+.google-shape-blue {
+  width: 150px;
+  height: 150px;
+  background: var(--bylot-indigo);
+  top: 10%;
+  left: 5%;
+  animation-duration: 9s;
+}
+
+.google-shape-red {
+  width: 180px;
+  height: 180px;
+  background: var(--bylot-pink);
+  bottom: 15%;
+  right: 8%;
+  animation-duration: 11s;
+  animation-delay: -3s;
+}
+
+.google-shape-yellow {
+  width: 130px;
+  height: 130px;
+  background: var(--bylot-amber);
+  top: 45%;
+  right: 15%;
+  animation-duration: 7s;
+  animation-delay: -5s;
+}
+
+.google-shape-green {
+  width: 160px;
+  height: 160px;
+  background: var(--bylot-emerald);
+  bottom: 10%;
+  left: 12%;
+  animation-duration: 10s;
+  animation-delay: -2s;
+}
+
+@keyframes bylotFloat {
+  0% { transform: translateY(0px) rotate(0deg) scale(1); }
+  50% { transform: translateY(-25px) rotate(180deg) scale(1.1); }
+  100% { transform: translateY(15px) rotate(360deg) scale(0.95); }
+}
+
+/* Orbiting Ring SVG Animation */
+.google-orbit-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: 600px;
+  border: 1.5px dashed rgba(79, 70, 229, 0.25);
+  border-radius: 50%;
+  animation: spinOrbit 35s linear infinite;
+}
+
+@keyframes spinOrbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Holographic 3D Skill Badge Card */
+.google-skill-card {
+  position: relative;
+  background: var(--bg-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 24px;
+  padding: 1.75rem;
+  overflow: hidden;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease, border-color 0.4s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+}
+
+.google-skill-card::before {
+  content: '';
+  position: absolute;
+  inset: -100%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 40%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0.05) 60%,
+    transparent 100%
+  );
+  transform: translateX(-100%) rotate(25deg);
+  transition: transform 0.8s ease-in-out;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.google-skill-card:hover::before {
+  transform: translateX(100%) rotate(25deg);
+}
+
+.google-skill-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(79, 70, 229, 0.18), 0 0 25px rgba(236, 72, 153, 0.12);
+  border-color: rgba(79, 70, 229, 0.4);
+}
+
+/* Glowing Border Accent Bar */
+.google-card-accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--bylot-gradient-multi);
+  background-size: 300% 300%;
+  animation: gradientFlow 4s ease infinite;
+}
+
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Badge Icon Wrapper with Pulse Ring */
+.google-badge-icon-wrapper {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  margin-bottom: 1.25rem;
+  background: var(--bg-solid);
+  box-shadow: inset 0 0 12px rgba(79, 70, 229, 0.1), 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.google-badge-pulse-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 24px;
+  border: 2px solid var(--bylot-indigo);
+  opacity: 0.6;
+  animation: badgePulse 2s ease-out infinite;
+}
+
+@keyframes badgePulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+
+/* Skill Chip Tag */
+.google-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--bylot-indigo);
+  border: 1px solid rgba(79, 70, 229, 0.25);
+  transition: all 0.3s ease;
+}
+
+body.dark-mode .google-skill-chip {
+  background: rgba(129, 140, 248, 0.2);
+  color: #a5b4fc;
+}
+
+.google-skill-chip.green {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+body.dark-mode .google-skill-chip.green {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+
+.google-skill-chip.yellow {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+body.dark-mode .google-skill-chip.yellow {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fcd34d;
+}
+
+.google-skill-chip.red {
+  background: rgba(236, 72, 153, 0.1);
+  color: #db2777;
+  border-color: rgba(236, 72, 153, 0.25);
+}
+
+body.dark-mode .google-skill-chip.red {
+  background: rgba(236, 72, 153, 0.2);
+  color: #f472b6;
+}
+
+/* Animated Progress Bar */
+.google-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: rgba(150, 150, 150, 0.15);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 1rem;
+  position: relative;
+}
+
+.google-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--bylot-gradient-glow);
+  background-size: 200% 100%;
+  animation: gradientFlow 3s linear infinite;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Bylot Glow Action Button */
+.bylot-btn-glow, .google-btn-glow {
+  position: relative;
+  background: var(--bylot-gradient-multi);
+  background-size: 300% 300%;
+  color: white !important;
+  border: none;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.85rem 2rem;
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.35);
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bylot-btn-glow:hover, .google-btn-glow:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(79, 70, 229, 0.45), 0 0 20px rgba(236, 72, 153, 0.4);
+  animation: gradientFlow 2s ease infinite;
+}
+
+.bylot-btn-glow:active, .google-btn-glow:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+/* Title Typography */
+.bylot-skill-title, .google-skill-title {
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--text-main) 0%, var(--bylot-indigo) 60%, var(--bylot-pink) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+  margin-bottom: 0.75rem;
+}
+
+/* Modal Unlock Overlay */
+.google-unlock-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.google-unlock-card {
+  background: var(--bg-solid);
+  border: 2px solid var(--bylot-indigo);
+  border-radius: 28px;
+  padding: 2.5rem;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(0,0,0,0.4), 0 0 40px rgba(79, 70, 229, 0.3);
+  animation: modalPopIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(0.7) translateY(30px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Confetti Burst Dots */
+.confetti-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  animation: confettiExplode 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes confettiExplode {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}

@@ -1,15 +1,27 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const backendTarget = process.env.VITE_API_BASE_URL || 'http://localhost:5000'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-// https://vitejs.dev/config/
+const backendTarget = 'https://localhost:5000'
+
+const certPath = path.resolve(__dirname, '..', 'backend', 'certs')
+const httpsConfig = fs.existsSync(path.join(certPath, 'key.pem'))
+  ? {
+      key: fs.readFileSync(path.join(certPath, 'key.pem')),
+      cert: fs.readFileSync(path.join(certPath, 'cert.pem')),
+    }
+  : undefined
+
 export default defineConfig({
-  plugins: [react()],
   base: "/",
   server: {
-    host: true, // Calls listen on all local IPs
+    host: true,
     port: 5173,
+    ...(httpsConfig ? { https: httpsConfig } : {}),
     proxy: {
       '/api': {
         target: backendTarget,
@@ -25,6 +37,7 @@ export default defineConfig({
   },
   preview: {
     port: 4173,
+    ...(httpsConfig ? { https: httpsConfig } : {}),
     proxy: {
       '/api': {
         target: backendTarget,

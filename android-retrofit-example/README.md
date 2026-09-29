@@ -5,7 +5,7 @@ This is a drop-in Kotlin + Jetpack Compose + Retrofit example for connecting an 
 Backend endpoint:
 
 ```http
-GET http://192.168.1.5:3000/products
+GET https://192.168.1.5:5000/api/products
 ```
 
 Expected response:
@@ -24,16 +24,17 @@ Expected response:
 ## Localhost Rules
 
 - Android Emulator cannot call your PC backend using `localhost`.
-- Android Emulator should use `http://10.0.2.2:3000/`.
-- A real Android phone should use your computer LAN IP, for example `http://192.168.1.5:3000/`.
+- Android Emulator should use `https://10.0.2.2:5000/`.
+- A real Android phone should use your computer LAN IP, for example `https://192.168.1.5:5000/`.
 - Phone and PC must be connected to the same WiFi network.
 - Your backend must listen on `0.0.0.0` or your LAN IP, not only `127.0.0.1`.
-- Windows Firewall must allow inbound traffic on port `3000`.
+- Windows Firewall must allow inbound traffic on port `5000`.
+- The backend uses a self-signed SSL certificate. You must install the cert on the device or configure the app to trust user-added CAs (already configured in `network_security_config.xml`).
 
 This example uses:
 
 ```kotlin
-const val BASE_URL = "http://192.168.1.5:3000/"
+const val BASE_URL = "https://192.168.1.5:5000/"
 ```
 
 It also sends this local API key header:
@@ -45,7 +46,7 @@ x-api-key: 07dad0dd8d8e9ce8ffb28f53bd4156b75b2a61e22ee67c8fa4c4bca0a93a14c0
 For emulator testing, change it to:
 
 ```kotlin
-const val BASE_URL = "http://10.0.2.2:3000/"
+const val BASE_URL = "https://10.0.2.2:5000/"
 ```
 
 ## Run This Example

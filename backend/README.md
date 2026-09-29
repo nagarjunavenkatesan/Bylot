@@ -41,7 +41,7 @@ $env:ADMIN_EMAIL="admin@bylot.com"; $env:ADMIN_PASSWORD="Password123"; npm run c
 The API will be available at:
 
 ```text
-http://localhost:5000
+https://localhost:5000
 ```
 
 Health check:
@@ -163,7 +163,7 @@ Authorization: Bearer ACCESS_TOKEN_HERE
 Profile image:
 
 ```bash
-curl -X POST http://localhost:5000/api/users/profile/image \
+curl -X POST https://localhost:5000/api/users/profile/image \
   -H "Authorization: Bearer ACCESS_TOKEN" \
   -F "profileImage=@avatar.png"
 ```
@@ -171,7 +171,7 @@ curl -X POST http://localhost:5000/api/users/profile/image \
 Product image:
 
 ```bash
-curl -X POST http://localhost:5000/api/sellers/uploads/product-image \
+curl -X POST https://localhost:5000/api/sellers/uploads/product-image \
   -H "Authorization: Bearer ACCESS_TOKEN" \
   -F "productImage=@product.png"
 ```

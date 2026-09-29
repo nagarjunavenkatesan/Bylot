@@ -4,10 +4,16 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.security.SecureRandom
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 
 object RetrofitClient {
-    const val BASE_URL = "http://192.168.1.5:5000/"
+    const val BASE_URL = "https://192.168.1.5:5000/"
     private const val API_KEY = "07dad0dd8d8e9ce8ffb28f53bd4156b75b2a61e22ee67c8fa4c4bca0a93a14c0"
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {

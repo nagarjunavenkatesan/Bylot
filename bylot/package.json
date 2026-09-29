@@ -5,11 +5,11 @@
   "type": "module",
   "homepage": "https://nagarjunavenkatesan.github.io/Bylot",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"vite\"",
+    "dev": "concurrently \"npm run server\" \"node ./node_modules/vite/bin/vite.js --configLoader runner\"",
     "server": "node server/index.js",
-    "build": "vite build",
+    "build": "node ./node_modules/vite/bin/vite.js build --configLoader runner",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "node ./node_modules/vite/bin/vite.js preview --configLoader runner",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

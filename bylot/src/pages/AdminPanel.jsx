@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FaBoxOpen, FaChartLine, FaCheckCircle, FaEye, FaEyeSlash, FaFlag, FaLock, FaMapMarkedAlt, FaSearch, FaStore, FaTrash, FaUsers, FaUserShield } from 'react-icons/fa';
 import PageTransition from '../components/PageTransition';
 import DistrictAnalytics from '../components/DistrictAnalytics';
+import SecurityMcpDashboard from '../components/SecurityMcpDashboard';
+import { API_BASE_URL } from '../api/backendApi';
 import { useAuth } from '../context/AuthContext';
 import '../styles/AdminPanel.css';
 
@@ -12,6 +14,7 @@ const tabs = [
     { id: 'sellers',   label: 'Sellers',   icon: FaStore },
     { id: 'products',  label: 'Products',  icon: FaBoxOpen },
     { id: 'reports',   label: 'Reports',   icon: FaFlag },
+    { id: 'security',  label: 'Security & MCP', icon: FaUserShield },
 ];
 
 const productStatuses = ['draft', 'active', 'inactive', 'out_of_stock', 'blocked'];
@@ -21,7 +24,7 @@ function unwrapList(r) { return Array.isArray(r?.data) ? r.data : []; }
 
 async function adminRequest(path, options = {}) {
     const token = localStorage.getItem('accessToken');
-    const response = await fetch(path, {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
         ...options,
         headers: {
             'Content-Type': 'application/json',
@@ -46,6 +49,9 @@ const AdminPanel = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [activeTab, setActiveTab]   = useState('overview');
     const [query, setQuery]           = useState('');
+    const [productIdSearch, setProductIdSearch] = useState('');
+    const [productIdResult, setProductIdResult] = useState(null);
+    const [productIdLoading, setProductIdLoading] = useState(false);
 
     useEffect(() => {
         if (!localStorage.getItem('bylot-handshake')) {
@@ -129,6 +135,21 @@ const AdminPanel = () => {
         try { await action(); setMessage(successText); await loadAdminData(); }
         catch (err) { setError(err.message); }
         finally { setLoading(false); }
+    };
+
+    const handleProductIdSearch = async () => {
+        const id = productIdSearch.trim().toUpperCase();
+        if (!id) return;
+        setProductIdLoading(true); setError(''); setProductIdResult(null);
+        try {
+            const res = await adminRequest(`/api/admin/products/by-id?product_item_id=${encodeURIComponent(id)}`);
+            setProductIdResult(res.data || null);
+        } catch (err) {
+            setProductIdResult(null);
+            setError(err.message);
+        } finally {
+            setProductIdLoading(false);
+        }
     };
 
     const filteredUsers = useMemo(() => {
@@ -240,8 +261,9 @@ const AdminPanel = () => {
                     )}
 
                     {activeTab === 'districts' && <DistrictAnalytics rows={districtStats} totals={districtTotals} loading={loading} />}
+                    {activeTab === 'security' && <SecurityMcpDashboard />}
 
-                    {!['overview', 'districts', 'reports'].includes(activeTab) && (
+                    {!['overview', 'districts', 'reports', 'security'].includes(activeTab) && (
                         <AdminSearch activeTab={activeTab} query={query} setQuery={setQuery} />
                     )}
 
@@ -277,25 +299,66 @@ const AdminPanel = () => {
 
                     {/* Products */}
                     {activeTab === 'products' && (
-                        <AdminTable emptyText="No products found."
-                            columns={['Product ID', 'Product', 'Seller', 'Price', 'Status', 'Action']}
-                            rows={filteredProducts.map(item => [
-                                <span className="admin-product-id">{item.product_item_id || '—'}</span>,
-                                item.name,
-                                item.seller_name || item.category_name,
-                                `Rs ${Number(item.selling_price || item.price || 0).toLocaleString('en-IN')}`,
-                                <StatusPill status={item.status} />,
-                                <div className="admin-action-row">
-                                    <select value={item.status} onChange={e => runAction(() => adminRequest(`/api/admin/products/${item.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: e.target.value }) }), 'Product status updated.')}>
-                                        {productStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                    <button type="button" className="admin-icon-btn danger" aria-label={`Delete ${item.name}`}
-                                        onClick={() => runAction(() => adminRequest(`/api/admin/products/${item.id}`, { method: 'DELETE' }), 'Product deleted.')}>
-                                        <FaTrash />
+                        <>
+                            <div className="admin-id-search">
+                                <div className="admin-id-search-input">
+                                    <FaSearch />
+                                    <input value={productIdSearch} onChange={e => setProductIdSearch(e.target.value)}
+                                        placeholder="Search by product ID (e.g. PRD-XXXXXX)"
+                                        onKeyDown={e => { if (e.key === 'Enter') handleProductIdSearch(); }} />
+                                    <button type="button" className="admin-id-search-btn" onClick={handleProductIdSearch} disabled={productIdLoading}>
+                                        {productIdLoading ? 'Searching...' : 'Find'}
                                     </button>
                                 </div>
-                            ])}
-                        />
+                                {productIdResult && (
+                                    <div className="admin-id-result">
+                                        <div className="admin-id-result-header">
+                                            <span className="admin-product-id">{productIdResult.product_item_id}</span>
+                                            <StatusPill status={productIdResult.status} />
+                                        </div>
+                                        <div className="admin-id-result-body">
+                                            <div><strong>{productIdResult.name}</strong></div>
+                                            <div>Seller: {productIdResult.seller_name} | Category: {productIdResult.category_name}</div>
+                                            <div>Price: Rs {Number(productIdResult.selling_price || 0).toLocaleString('en-IN')}</div>
+                                        </div>
+                                        <div className="admin-id-result-actions">
+                                            <select value={productIdResult.status} onChange={e => runAction(async () => {
+                                                await adminRequest(`/api/admin/products/${productIdResult.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: e.target.value }) });
+                                                setProductIdResult(prev => ({ ...prev, status: e.target.value }));
+                                            }, 'Product status updated.')}>
+                                                {productStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                                            </select>
+                                            <button type="button" className="admin-mini-btn reject" onClick={() => runAction(async () => {
+                                                await adminRequest(`/api/admin/products/${productIdResult.id}`, { method: 'DELETE' });
+                                                setProductIdResult(null);
+                                                setProductIdSearch('');
+                                            }, 'Product deleted.')}>
+                                                <FaTrash /> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <AdminTable emptyText="No products found."
+                                columns={['Product ID', 'Product', 'Seller', 'Price', 'Status', 'Action']}
+                                rows={filteredProducts.map(item => [
+                                    <span className="admin-product-id">{item.product_item_id || '—'}</span>,
+                                    item.name,
+                                    item.seller_name || item.category_name,
+                                    `Rs ${Number(item.selling_price || item.price || 0).toLocaleString('en-IN')}`,
+                                    <StatusPill status={item.status} />,
+                                    <div className="admin-action-row">
+                                        <select value={item.status} onChange={e => runAction(() => adminRequest(`/api/admin/products/${item.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: e.target.value }) }), 'Product status updated.')}>
+                                            {productStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                        <button type="button" className="admin-icon-btn danger" aria-label={`Delete ${item.name}`}
+                                            onClick={() => runAction(() => adminRequest(`/api/admin/products/${item.id}`, { method: 'DELETE' }), 'Product deleted.')}>
+                                            <FaTrash />
+                                        </button>
+                                    </div>
+                                ])}
+                            />
+                        </>
                     )}
 
                     {/* ── Fraud Reports Tab ── */}
@@ -377,7 +440,7 @@ function FraudReportsTab({ reports, allReports, query, setQuery, runAction, admi
                                 <div className="report-card-product">
                                     {rpt.product_image && (
                                         <img
-                                            src={rpt.product_image.startsWith('http') ? rpt.product_image : `http://localhost:5000/${rpt.product_image}`}
+                                            src={rpt.product_image.startsWith('http') ? rpt.product_image : `${API_BASE_URL}/${String(rpt.product_image).replace(/^\/+/, '')}`}
                                             alt={rpt.product_name}
                                             className="report-product-thumb"
                                             onError={e => { e.target.style.display = 'none'; }}

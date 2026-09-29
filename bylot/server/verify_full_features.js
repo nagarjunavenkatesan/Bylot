@@ -1,6 +1,8 @@
 import fetch from 'node-fetch';
+import https from 'https';
 
-const BASE_URL = 'http://localhost:5000/api';
+const agent = new https.Agent({ rejectUnauthorized: false });
+const BASE_URL = 'https://localhost:5000/api';
 
 async function testFullFeatures() {
     console.log('Starting Full Feature Verification (Auth + Items CRUD)...');
@@ -24,7 +26,8 @@ async function testFullFeatures() {
                 email,
                 phone,
                 password
-            })
+            }),
+            agent,
         });
         const data = await res.json();
         console.log('   Status:', res.status);
@@ -43,7 +46,8 @@ async function testFullFeatures() {
         const res = await fetch(`${BASE_URL}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password }),
+            agent,
         });
         const data = await res.json();
         console.log('   Status:', res.status);
@@ -68,11 +72,11 @@ async function testFullFeatures() {
             expiryDate: new Date(Date.now() + 86400000).toISOString(),
             category: 'Vegetables',
             location: '123 Test Lane',
-            locationLink: 'http://maps.google.com',
+            locationLink: 'https://maps.google.com',
             latitude: 12,
             longitude: 77,
             sellerId: userId,
-            imageUrl: 'http://example.com/img.jpg'
+            imageUrl: 'https://example.com/img.jpg'
         };
 
         const res = await fetch(`${BASE_URL}/items`, {
@@ -81,7 +85,8 @@ async function testFullFeatures() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify(itemData)
+            body: JSON.stringify(itemData),
+            agent,
         });
         const data = await res.json();
         console.log('   Status:', res.status);
@@ -96,7 +101,7 @@ async function testFullFeatures() {
     // Verify Item Exists AND Check Edit Feasibility
     try {
         console.log('\n4. Verifying Item Fetch...');
-        const res = await fetch(`${BASE_URL}/items/${itemId}`);
+        const res = await fetch(`${BASE_URL}/items/${itemId}`, { agent });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message);
         if (data.name !== 'Test Item') throw new Error('Item name mismatch');
@@ -117,8 +122,8 @@ async function testFullFeatures() {
             expiryDate: new Date(Date.now() + 172800000).toISOString(),
             category: 'Fruits',
             location: '456 Updated Lane',
-            locationLink: 'http://maps.google.com/updated',
-            imageUrl: 'http://example.com/img_updated.jpg'
+            locationLink: 'https://maps.google.com/updated',
+            imageUrl: 'https://example.com/img_updated.jpg'
         };
 
         const res = await fetch(`${BASE_URL}/items/${itemId}`, {
@@ -127,7 +132,8 @@ async function testFullFeatures() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify(updateData)
+            body: JSON.stringify(updateData),
+            agent,
         });
         const data = await res.json();
         console.log('   Status:', res.status);
@@ -148,7 +154,8 @@ async function testFullFeatures() {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`
-            }
+            },
+            agent,
         });
         console.log('   Status:', res.status);
         if (!res.ok) throw new Error('Delete failed');
@@ -161,7 +168,7 @@ async function testFullFeatures() {
     // Verify Deletion (Should 404)
     try {
         console.log('\n7. Verifying Deletion...');
-        const res = await fetch(`${BASE_URL}/items/${itemId}`);
+        const res = await fetch(`${BASE_URL}/items/${itemId}`, { agent });
         if (res.status === 404) {
              console.log('   Confirmed: Item not found (404) as expected.');
         } else {

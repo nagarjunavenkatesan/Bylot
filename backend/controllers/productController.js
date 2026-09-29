@@ -33,14 +33,30 @@ async function listProducts(req, customWhere = [], customParams = []) {
   }
 
   const whereSql = where.join(" AND ");
-  const sql = `${baseProductQuery(whereSql)} ORDER BY ${sortClause(req.query.sort)} LIMIT ? OFFSET ?`;
+  const safeLimit = Math.max(1, Number(limit) || 20);
+  const safeOffset = Math.max(0, Number(offset) || 0);
 
   const [countRows] = await pool.query(
     `SELECT COUNT(*) AS total FROM products p JOIN sellers s ON s.id = p.seller_id WHERE ${whereSql}`,
     params
   );
-  const [rows] = await pool.query(sql, [...params, limit, offset]);
-  return { rows, meta: buildMeta(countRows[0].total, page, limit) };
+  let rows = [];
+  try {
+    const sql = `${baseProductQuery(whereSql)} ORDER BY ${sortClause(req.query.sort)} LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+    const [resultRows] = await pool.query(sql, params);
+    rows = resultRows;
+  } catch (err) {
+    // If database schema is missing p.product_item_id, retry without product_item_id
+    if (err.code === 'ER_BAD_FIELD_ERROR' && err.message.includes('product_item_id')) {
+      const fallbackQuery = baseProductQuery(whereSql).replace('p.product_item_id,', '');
+      const sql = `${fallbackQuery} ORDER BY ${sortClause(req.query.sort)} LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+      const [resultRows] = await pool.query(sql, params);
+      rows = resultRows;
+    } else {
+      throw err;
+    }
+  }
+  return { rows, meta: buildMeta(countRows[0]?.total || 0, page, limit) };
 }
 
 const getAllProducts = asyncHandler(async (req, res) => {

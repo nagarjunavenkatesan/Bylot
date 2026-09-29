@@ -4,30 +4,31 @@ function formatCurrency(value) {
     return `Rs ${Number(value || 0).toLocaleString('en-IN')}`;
 }
 
-function DistrictBarChart({ title, rows, valueKey, countKey, color }) {
-    const maxValue = Math.max(...rows.map((row) => row[valueKey]), 1);
+function DistrictBarChart({ title, rows = [], valueKey, countKey, color }) {
+    const values = rows.map((row) => Number(row[valueKey]) || 0);
+    const maxValue = values.length > 0 ? Math.max(...values, 1) : 1;
 
     return (
         <article className="admin-chart-card">
             <div className="admin-chart-head">
                 <h3>{title}</h3>
-                <span>{rows.reduce((sum, row) => sum + row[countKey], 0)} total</span>
+                <span>{rows.reduce((sum, row) => sum + (Number(row[countKey]) || 0), 0)} total</span>
             </div>
             <div className="admin-chart-body">
                 {rows.length === 0 ? (
                     <p className="admin-chart-empty">No district data yet.</p>
                 ) : (
-                    rows.map((row) => (
-                        <div className="admin-chart-row" key={`${title}-${row.district}`}>
+                    rows.map((row, idx) => (
+                        <div className="admin-chart-row" key={`${title}-${row.district || idx}`}>
                             <div className="admin-chart-meta">
-                                <strong>{row.district}</strong>
-                                <span>{row[countKey]} listings · {formatCurrency(row[valueKey])}</span>
+                                <strong>{row.district || 'Unknown District'}</strong>
+                                <span>{row[countKey] || 0} listings · {formatCurrency(row[valueKey])}</span>
                             </div>
                             <div className="admin-chart-track">
                                 <div
                                     className="admin-chart-bar"
                                     style={{
-                                        width: `${Math.max((row[valueKey] / maxValue) * 100, row[countKey] ? 8 : 0)}%`,
+                                        width: `${Math.max(((Number(row[valueKey]) || 0) / maxValue) * 100, row[countKey] ? 8 : 0)}%`,
                                         background: color,
                                     }}
                                 />
@@ -41,13 +42,14 @@ function DistrictBarChart({ title, rows, valueKey, countKey, color }) {
 }
 
 const DistrictAnalytics = ({ rows = [], totals = null, loading = false }) => {
+    const safeRows = Array.isArray(rows) ? rows : [];
     const sellRows = useMemo(
-        () => [...rows].sort((a, b) => b.sellCount - a.sellCount || a.district.localeCompare(b.district)),
-        [rows]
+        () => [...safeRows].sort((a, b) => (Number(b?.sellCount) || 0) - (Number(a?.sellCount) || 0) || String(a?.district || '').localeCompare(String(b?.district || ''))),
+        [safeRows]
     );
     const buyRows = useMemo(
-        () => [...rows].sort((a, b) => b.buyCount - a.buyCount || a.district.localeCompare(b.district)),
-        [rows]
+        () => [...safeRows].sort((a, b) => (Number(b?.buyCount) || 0) - (Number(a?.buyCount) || 0) || String(a?.district || '').localeCompare(String(b?.district || ''))),
+        [safeRows]
     );
 
     if (loading) {

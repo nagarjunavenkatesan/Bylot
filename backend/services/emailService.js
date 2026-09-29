@@ -32,6 +32,24 @@ async function sendPasswordResetEmail(email, resetToken) {
   return { delivered: true };
 }
 
+async function sendAlertEmail(subject, message) {
+  const transporter = createTransporter();
+  if (!transporter) return { delivered: false };
+
+  try {
+    await transporter.sendMail({
+      from: env.mail.from,
+      to: env.adminEmail || env.mail.from,
+      subject: `[Bylot] ${subject}`,
+      text: message
+    });
+    return { delivered: true };
+  } catch {
+    return { delivered: false };
+  }
+}
+
 module.exports = {
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendAlertEmail
 };

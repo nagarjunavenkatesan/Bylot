@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
-const port = 5000;
+const port = Number(process.env.BYLOT_PORT) || 3001;
 const clientApiKey = process.env.BYLOT_CLIENT_API_KEY;
 
 const requireClientApiKey = (req, res, next) => {
@@ -143,6 +143,12 @@ const ADMIN_EMAILS = new Set([
     'nagarjunavenkatesan@gmail.com',
     ...(process.env.ADMIN_EMAIL ? [process.env.ADMIN_EMAIL] : []),
 ]);
+
+const makeProductItemId = (id) => `PRD-${String(id).padStart(6, '0')}`;
+const decorateItem = (item) => (item
+    ? { ...item, product_item_id: item.product_item_id || makeProductItemId(item.id) }
+    : item);
+const decorateItems = (items) => items.map(decorateItem);
 
 // Google Auth Route
 app.post('/api/auth/google', async (req, res) => {
@@ -306,6 +312,42 @@ app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
     }
 });
 
+app.get('/api/users/profile', requireAuth, async (req, res) => {
+    try {
+        const result = await query(
+            'SELECT id, name, email, phone, role, status, created_at FROM users WHERE id = ? LIMIT 1',
+            [req.user.id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err) {
+        console.error('[API_GET_SELF_PROFILE_ERROR]', err);
+        res.status(500).json({ message: 'Server error fetching profile' });
+    }
+});
+
+app.put('/api/users/profile', requireAuth, async (req, res) => {
+    const { phone } = req.body;
+
+    try {
+        const result = await query('UPDATE users SET phone = ? WHERE id = ?', [phone || null, req.user.id]);
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const updated = await query(
+            'SELECT id, name, email, phone, role, status, created_at FROM users WHERE id = ? LIMIT 1',
+            [req.user.id]
+        );
+        res.json({ success: true, message: 'User profile updated successfully', data: updated.rows[0] });
+    } catch (err) {
+        console.error('[API_UPDATE_SELF_PROFILE_ERROR]', err);
+        res.status(500).json({ message: 'Server error updating profile' });
+    }
+});
+
 app.patch('/api/admin/users/:id/status', requireAuth, requireAdmin, async (req, res) => {
     const status = req.body.status === 'blocked' ? 'blocked' : 'active';
 
@@ -355,6 +397,24 @@ app.patch('/api/admin/sellers/:id/approve', requireAuth, requireAdmin, async (re
     }
 });
 
+app.get('/api/sellers/profile', requireAuth, async (req, res) => {
+    try {
+        const seller = await query(
+            'SELECT id, name, email, phone, role, status, created_at FROM users WHERE id = ? AND role = \'seller\' LIMIT 1',
+            [req.user.id]
+        );
+
+        if (seller.rows.length === 0) {
+            return res.status(404).json({ message: 'Seller profile not found' });
+        }
+
+        res.json({ success: true, data: seller.rows[0] });
+    } catch (err) {
+        console.error('[API_GET_SELLER_PROFILE_ERROR]', err);
+        res.status(500).json({ message: 'Server error fetching seller profile' });
+    }
+});
+
 app.get('/api/admin/products', requireAuth, requireAdmin, async (req, res) => {
     try {
         const products = await query(`
@@ -367,10 +427,124 @@ app.get('/api/admin/products', requireAuth, requireAdmin, async (req, res) => {
             ORDER BY items.created_at DESC
             LIMIT 50
         `);
-        res.json({ success: true, data: products.rows });
+        res.json({ success: true, data: decorateItems(products.rows) });
     } catch (err) {
         console.error('[API_ADMIN_PRODUCTS_ERROR]', err);
         res.status(500).json({ message: 'Server error fetching products' });
+    }
+});
+
+app.get('/api/admin/products/by-id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const { product_item_id } = req.query;
+        if (!product_item_id) {
+            return res.status(400).json({ message: 'product_item_id query parameter is required' });
+        }
+
+        const numericId = Number(String(product_item_id).replace(/\D/g, ''));
+
+        const result = await query(
+            `
+            SELECT
+                items.*,
+                users.name AS seller_name,
+                items.category AS category_name
+            FROM items
+            LEFT JOIN users ON items.seller_id = users.id
+            WHERE items.product_item_id = ? OR items.id = ?
+            LIMIT 1
+            `,
+            [product_item_id, numericId || 0]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+
+        res.json({ success: true, data: decorateItem(result.rows[0]) });
+    } catch (err) {
+        console.error('[API_ADMIN_PRODUCT_BY_ID_ERROR]', err);
+        res.status(500).json({ message: 'Server error fetching product' });
+    }
+});
+
+app.get('/api/admin/reports', requireAuth, requireAdmin, async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 100, 200);
+    const status = String(req.query.status || '').trim();
+    const params = [];
+    const where = status ? 'WHERE r.status = ?' : '';
+    if (status) params.push(status);
+
+    try {
+        const reports = await query(
+            `
+            SELECT
+                r.id,
+                r.product_id,
+                r.reporter_id,
+                r.reason,
+                r.description,
+                r.status,
+                r.admin_note,
+                r.resolved_by,
+                r.resolved_at,
+                r.created_at,
+                p.name AS product_name,
+                p.image_url AS product_image,
+                p.seller_id,
+                seller.name AS seller_name,
+                reporter.name AS reporter_name,
+                reporter.email AS reporter_email
+            FROM product_reports r
+            JOIN items p ON p.id = r.product_id
+            JOIN users reporter ON reporter.id = r.reporter_id
+            LEFT JOIN users seller ON seller.id = p.seller_id
+            ${where}
+            ORDER BY r.created_at DESC
+            LIMIT ?
+            `,
+            [...params, limit]
+        );
+
+        res.json({ success: true, data: reports.rows });
+    } catch (err) {
+        console.error('[API_ADMIN_REPORTS_ERROR]', err);
+        res.status(500).json({ message: 'Server error fetching reports' });
+    }
+});
+
+app.patch('/api/admin/reports/:id/resolve', requireAuth, requireAdmin, async (req, res) => {
+    const reportStatus = ['pending', 'reviewed', 'resolved', 'dismissed'].includes(req.body.status)
+        ? req.body.status
+        : 'reviewed';
+    const adminNote = req.body.adminNote || null;
+
+    try {
+        const report = await query('SELECT * FROM product_reports WHERE id = ? LIMIT 1', [req.params.id]);
+        if (report.rows.length === 0) {
+            return res.status(404).json({ message: 'Report not found' });
+        }
+
+        const current = report.rows[0];
+        await query(
+            'UPDATE product_reports SET status = ?, admin_note = ?, resolved_by = ?, resolved_at = ? WHERE id = ?',
+            [
+                reportStatus,
+                adminNote,
+                req.user.id,
+                reportStatus === 'pending' ? null : new Date(),
+                req.params.id,
+            ]
+        );
+
+        if (reportStatus === 'resolved') {
+            await query('UPDATE items SET status = ? WHERE id = ?', ['blocked', current.product_id]);
+        }
+
+        res.json({ success: true, message: 'Report updated successfully' });
+    } catch (err) {
+        console.error('[API_ADMIN_REPORT_RESOLVE_ERROR]', err);
+        res.status(500).json({ message: 'Server error updating report' });
     }
 });
 
@@ -524,7 +698,7 @@ app.post('/api/items', requireAuth, upload.single('image'), async (req, res) => 
         );
 
         const newItem = await query('SELECT * FROM items WHERE id = ?', [result.insertId]);
-        res.status(201).json({ message: 'Item created successfully', item: newItem.rows[0] });
+        res.status(201).json({ message: 'Item created successfully', item: decorateItem(newItem.rows[0]) });
     } catch (err) {
         console.error('[API_CREATE_ITEM_ERROR]', err);
         res.status(500).json({ message: 'Server error during item creation', errorId: 'ERR_CREATE_ITEM_500' });
@@ -556,7 +730,7 @@ app.get(['/api/items', '/api/products'], async (req, res) => {
         } else {
             items = await query('SELECT * FROM items ORDER BY created_at DESC');
         }
-        res.json(items.rows);
+        res.json(decorateItems(items.rows));
     } catch (err) {
         console.error('[API_GET_ITEMS_ERROR]', err);
         res.status(500).json({ message: 'Server error fetching items', errorId: 'ERR_GET_ITEMS_500' });
@@ -668,7 +842,7 @@ app.get(['/api/items/:id', '/api/products/:id'], async (req, res) => {
         if (item.rows.length === 0) {
             return res.status(404).json({ message: 'Item not found' });
         }
-        res.json(item.rows[0]);
+        res.json(decorateItem(item.rows[0]));
     } catch (err) {
         console.error('[API_GET_ITEM_ERROR]', err);
         res.status(500).json({ message: 'Server error fetching item details', errorId: 'ERR_GET_ITEM_500' });
@@ -687,6 +861,36 @@ app.get('/api/users/:id', async (req, res) => {
     } catch (err) {
         console.error('[API_GET_USER_ERROR]', err);
         res.status(500).json({ message: 'Server error fetching user details', errorId: 'ERR_GET_USER_500' });
+    }
+});
+
+app.post('/api/products/:id/report', requireAuth, async (req, res) => {
+    const { id } = req.params;
+    const { reason = 'other', description = '' } = req.body || {};
+
+    try {
+        const product = await query('SELECT id FROM items WHERE id = ? LIMIT 1', [id]);
+        if (product.rows.length === 0) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+
+        const result = await query(
+            `INSERT INTO product_reports (product_id, reporter_id, reason, description, status)
+             VALUES (?, ?, ?, ?, 'pending')`,
+            [id, req.user.id, reason, description]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'Report submitted successfully',
+            data: { id: result.insertId },
+        });
+    } catch (err) {
+        if (err?.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ message: 'You have already reported this product' });
+        }
+        console.error('[API_REPORT_PRODUCT_ERROR]', err);
+        res.status(500).json({ message: 'Server error submitting report' });
     }
 });
 
@@ -715,7 +919,7 @@ app.put(['/api/items/:id', '/api/products/:id'], requireAuth, async (req, res) =
             return res.status(404).json({ message: 'Item not found' });
         }
         const updated = await query('SELECT * FROM items WHERE id = ?', [id]);
-        res.json({ message: 'Item updated successfully', item: updated.rows[0] });
+        res.json({ message: 'Item updated successfully', item: decorateItem(updated.rows[0]) });
     } catch (err) {
         console.error('[API_UPDATE_ITEM_ERROR]', err);
         res.status(500).json({ message: 'Server error updating item', errorId: 'ERR_UPDATE_ITEM_500' });
@@ -808,6 +1012,8 @@ app.post('/api/chat', (req, res) => {
     }, 500);
 });
 
-app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running on all interfaces at port ${port}`);
+const host = process.env.HOST || '127.0.0.1';
+
+app.listen(port, host, () => {
+    console.log(`Server running on ${host}:${port}`);
 });

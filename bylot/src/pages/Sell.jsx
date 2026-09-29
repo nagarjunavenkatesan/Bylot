@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import Button from '../components/Button';
 import PageTransition from '../components/PageTransition';
 import { apiRequest } from '../api/backendApi';
+import { useAuth } from '../context/AuthContext';
 import '../styles/Sell.css';
 
 const DISTRICTS = [
@@ -15,7 +15,10 @@ const DISTRICTS = [
 
 const Sell = () => {
     const navigate = useNavigate();
-    const [showPhoneModal, setShowPhoneModal] = useState(false);
+    const { user } = useAuth();
+    const [showPhoneModal, setShowPhoneModal] = useState(() => {
+        return user ? !user.phone : false;
+    });
     const [phoneNumber, setPhoneNumber] = useState('');
     const [formData, setFormData] = useState({
         name: '', description: '', price: '', originalPrice: '',
@@ -25,21 +28,27 @@ const Sell = () => {
     });
 
     useEffect(() => {
-        const userStr = localStorage.getItem('user');
-        if (!userStr) { navigate('/login', { state: { from: '/sell' } }); return; }
-        const user = JSON.parse(userStr);
-        if (!user.phone) setShowPhoneModal(true);
-    }, [navigate]);
+        if (!user) { navigate('/login', { state: { from: '/sell' } }); return; }
+    }, [user, navigate]);
 
     const handleSavePhone = async e => {
         e.preventDefault();
         try {
             await apiRequest('/api/users/profile', {
-                method: 'PUT',
+                method: 'POST',
                 body: JSON.stringify({ phone: phoneNumber }),
             });
-            const current = JSON.parse(localStorage.getItem('user') || '{}');
-            localStorage.setItem('user', JSON.stringify({ ...current, phone: phoneNumber }));
+            let current = {};
+            try {
+                current = JSON.parse(localStorage.getItem('user') || '{}');
+            } catch (_) {
+                current = {};
+            }
+            const updatedUser = { ...current, phone: phoneNumber };
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('storage'));
+            }
             setShowPhoneModal(false);
             alert('Phone number saved!');
         } catch (err) {
@@ -68,15 +77,15 @@ const Sell = () => {
             const data = new FormData();
             data.append('name', formData.name);
             data.append('description', formData.description);
-            data.append('sellingPrice', formData.price);
-            data.append('mrp', formData.originalPrice || formData.price);
+            data.append('price', formData.price);
+            data.append('originalPrice', formData.originalPrice || formData.price);
             data.append('expiryDate', formData.expiryDate);
-            data.append('categoryId', 1); // default category
-            data.append('stockQuantity', 99);
+            data.append('category', formData.category);
+            data.append('district', formData.district);
             if (formData.latitude)  data.append('latitude',  formData.latitude);
             if (formData.longitude) data.append('longitude', formData.longitude);
             if (formData.image) {
-                data.append('productImage', formData.image);
+                data.append('image', formData.image);
             } else {
                 data.append('imageUrl', 'https://images.unsplash.com/photo-1563636619-e9143da7973b?auto=format&fit=crop&w=800&q=80');
             }
@@ -98,7 +107,7 @@ const Sell = () => {
             <div className="sell-page container">
                 {showPhoneModal && (
                     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)' }}>
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                        <div
                             style={{ backgroundColor: 'var(--card-bg)', padding: '2rem', borderRadius: '1rem', maxWidth: '400px', width: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', border: '1px solid var(--border-color)' }}>
                             <h3 style={{ marginBottom: '1rem' }}>Complete Your Profile</h3>
                             <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>A verified phone number is required for all sellers.</p>
@@ -109,11 +118,11 @@ const Sell = () => {
                                 </div>
                                 <Button type="submit" variant="primary" className="w-full">Verify & Continue</Button>
                             </form>
-                        </motion.div>
+                        </div>
                     </div>
                 )}
 
-                <motion.div className="sell-container" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+                <div className="sell-container">
                     <h2>List Your Item</h2>
                     <p className="subtitle">Help reduce waste and recover your investment.</p>
                     <form onSubmit={handleSubmit} className="sell-form">
@@ -169,7 +178,7 @@ const Sell = () => {
                         </div>
                         <Button type="submit" variant="primary" size="lg" className="w-full">Create Listing</Button>
                     </form>
-                </motion.div>
+                </div>
             </div>
         </PageTransition>
     );

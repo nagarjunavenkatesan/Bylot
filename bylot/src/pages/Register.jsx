@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
-import { motion } from 'framer-motion';
-import PageTransition from '../components/PageTransition';
 import { GoogleLogin } from '@react-oauth/google';
+import PageTransition from '../components/PageTransition';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../api/backendApi';
+
+function getRedirectPath(role) {
+    switch (role) {
+        case 'admin': return '/admin';
+        case 'seller': return '/sell';
+        default: return '/';
+    }
+}
 
 const Register = () => {
     const [formData, setFormData] = useState({ name: '', email: '', phone: '', otp: '', password: '', confirmPassword: '', _mockOtp: '' });
@@ -13,8 +20,39 @@ const Register = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [otpSent, setOtpSent] = useState(false);
     const [otpVerified, setOtpVerified] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [googleError, setGoogleError] = useState('');
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { login, user } = useAuth();
+
+    useEffect(() => {
+        if (user) {
+            navigate(getRedirectPath(user.role), { replace: true });
+        }
+    }, [user, navigate]);
+
+    const handleGoogleSuccess = async (credentialResponse) => {
+        setGoogleLoading(true);
+        setGoogleError('');
+        try {
+            const data = await apiRequest('/api/auth/google-login', {
+                method: 'POST',
+                body: JSON.stringify({ idToken: credentialResponse.credential }),
+            });
+            const userData = data.data?.user || data.user;
+            const accessToken = data.data?.accessToken || data.user?.token;
+            login({ ...userData, accessToken });
+            navigate(getRedirectPath(userData.role), { replace: true });
+        } catch (err) {
+            setGoogleError(err.message || 'Google sign-up failed. Please try again.');
+        } finally {
+            setGoogleLoading(false);
+        }
+    };
+
+    const handleGoogleError = () => {
+        setGoogleError('Google sign-up was cancelled or failed. Please try again.');
+    };
 
     const handleChange = e => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -36,7 +74,7 @@ const Register = () => {
         e.preventDefault();
         if (formData.password !== formData.confirmPassword) { alert('Passwords do not match'); return; }
         try {
-            await apiRequest('/api/auth/register', {
+            await apiRequest('/api/register', {
                 method: 'POST',
                 body: JSON.stringify({ name: formData.name, email: formData.email, phone: formData.phone, password: formData.password }),
             });
@@ -50,7 +88,7 @@ const Register = () => {
     return (
         <PageTransition>
             <div className="container" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <motion.div className="card" style={{ maxWidth: '400px', width: '100%' }} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>
+                <div className="card" style={{ maxWidth: '400px', width: '100%' }}>
                     <h2 className="section-title" style={{ fontSize: '2rem', marginBottom: '1.5rem', textAlign: 'center' }}>Create Account</h2>
                     <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', textAlign: 'center' }}>Join Bylot today</p>
 
@@ -109,24 +147,19 @@ const Register = () => {
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>OR</span>
                         </div>
 
+                        {googleError && (
+                            <p style={{ color: '#dc2626', marginBottom: '1rem', fontSize: '0.9rem', textAlign: 'center' }}>{googleError}</p>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
                             <GoogleLogin
-                                onSuccess={async cr => {
-                                    try {
-                                        const data = await apiRequest('/api/auth/google-login', {
-                                            method: 'POST',
-                                            body: JSON.stringify({ idToken: cr.credential }),
-                                        });
-                                        login({ ...data.data.user, accessToken: data.data.accessToken });
-                                        navigate('/');
-                                    } catch (err) {
-                                        alert(err.message || 'Google Sign-Up Error');
-                                    }
-                                }}
-                                onError={() => alert('Google Sign-Up Failed')}
+                                onSuccess={handleGoogleSuccess}
+                                onError={handleGoogleError}
                                 text="signup_with"
+                                shape="rectangular"
+                                width="300"
                             />
                         </div>
+                        {googleLoading && <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center' }}>Signing up...</p>}
                     </form>
 
                     <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
@@ -135,7 +168,7 @@ const Register = () => {
                             <Link to="/login" style={{ color: 'var(--primary)', fontWeight: '600' }}>Sign In</Link>
                         </p>
                     </div>
-                </motion.div>
+                </div>
             </div>
         </PageTransition>
     );

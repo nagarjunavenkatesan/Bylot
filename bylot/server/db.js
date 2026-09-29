@@ -209,6 +209,33 @@ export const initDb = async () => {
         console.error('[DATABASE] Schema Error (orders):', e.message);
     }
 
+    // Product reports used by the admin moderation panel
+    try {
+        await pool.execute(`
+            CREATE TABLE IF NOT EXISTS product_reports (
+                id           INT AUTO_INCREMENT PRIMARY KEY,
+                product_id   INT NOT NULL,
+                reporter_id  INT NOT NULL,
+                reason       VARCHAR(50)  NOT NULL,
+                description  TEXT         NULL,
+                status       VARCHAR(50)  DEFAULT 'pending',
+                admin_note   TEXT         NULL,
+                resolved_by  INT          NULL,
+                resolved_at  DATETIME     NULL,
+                created_at   DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (product_id) REFERENCES items(id) ON DELETE CASCADE,
+                FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (resolved_by) REFERENCES users(id) ON DELETE SET NULL,
+                UNIQUE KEY uk_one_report_per_user (product_id, reporter_id),
+                INDEX idx_reports_status (status),
+                INDEX idx_reports_product (product_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        console.log('[DATABASE] Verified schema: product_reports table exists.');
+    } catch (e) {
+        console.error('[DATABASE] Schema Error (product_reports):', e.message);
+    }
+
     // Backfill missing districts from location text
     try {
         const missingDistricts = await pool.execute(

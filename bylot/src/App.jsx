@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import Browse from './pages/Browse'
@@ -14,6 +14,14 @@ import AdminPanel from './pages/AdminPanel'
 import Loader from './components/Loader'
 import AIAssistant from './components/AIAssistant'
 import { LocationProvider } from './context/LocationContext'
+import { useAuth } from './context/AuthContext'
+
+function AdminRoute({ children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'admin') return <Navigate to="/" replace />;
+  return children;
+}
 
 function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('bylot-theme') || 'light');
@@ -43,7 +51,7 @@ function App() {
   }
 
   return (
-    <Router basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
+    <Router>
       <LocationProvider>
         <Layout theme={theme} toggleTheme={toggleTheme}>
           <Routes>
@@ -56,7 +64,7 @@ function App() {
             <Route path="/seller/:id" element={<SellerDetails />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/edit-item/:id" element={<EditItem />} />
-            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/admin" element={<AdminRoute><AdminPanel /></AdminRoute>} />
           </Routes>
           <AIAssistant />
         </Layout>

@@ -14,6 +14,8 @@ const REPORT_REASONS = [
 ];
 
 const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => {
+    if (!product) return null;
+
     const [showReport, setShowReport]     = useState(false);
     const [reason, setReason]             = useState('fake_product');
     const [description, setDescription]  = useState('');
@@ -46,20 +48,35 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
         }
     };
 
+    const origPrice = Number(product.originalPrice);
+    const currPrice = Number(product.price);
+    const discountPercent = origPrice && currPrice && origPrice > currPrice
+        ? Math.round(((origPrice - currPrice) / origPrice) * 100)
+        : null;
+
+    const distNum = product.distance != null ? Number(product.distance) : null;
+    const hasValidDistance = distNum != null && !isNaN(distNum);
+
     return (
-        <Card className="listing-card">
+        <Card className="listing-card google-skill-card">
+            <div className="google-card-accent-bar" />
             {/* Product image */}
             <Link to={`/product/${product.id}`} style={{ display: 'block', color: 'inherit' }}>
                 <div className="listing-image-container">
                     <img
-                        src={product.image}
-                        alt={product.name}
+                        src={product.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'}
+                        alt={product.name || 'Product'}
                         className="card-image"
-                        onError={e => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/400?text=No+Image'; }}
+                        onError={e => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'; }}
                     />
-                    <span className="expiry-tag">Expires: {product.expiry}</span>
-                    {product.distance != null && (
-                        <span className="distance-tag">{Number(product.distance).toFixed(1)} km away</span>
+                    <span className="expiry-tag">Expires: {product.expiry || 'N/A'}</span>
+                    {hasValidDistance && (
+                        <span className="distance-tag">{distNum.toFixed(1)} km away</span>
+                    )}
+                    {discountPercent > 0 && (
+                        <span className="google-skill-chip yellow" style={{ position: 'absolute', bottom: '1rem', left: '1rem', backdropFilter: 'blur(8px)', fontWeight: '800' }}>
+                            🔥 {discountPercent}% OFF
+                        </span>
                     )}
                 </div>
             </Link>
@@ -67,6 +84,11 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
             {/* Product details */}
             <div className="listing-details">
                 <Link to={`/product/${product.id}`} style={{ display: 'block', color: 'inherit' }}>
+                    <div style={{ marginBottom: '0.35rem' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: '800', color: 'var(--primary)', background: 'rgba(99, 102, 241, 0.14)', padding: '2px 7px', borderRadius: '6px', display: 'inline-block' }}>
+                            Item ID: {product.product_item_id || `#${product.id}`}
+                        </span>
+                    </div>
                     <h3 className="card-title">{product.name}</h3>
                     <p className="card-subtitle">{product.location}</p>
                     <div className="price-row">

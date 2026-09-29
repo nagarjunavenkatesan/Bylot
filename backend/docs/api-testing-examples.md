@@ -3,7 +3,7 @@
 Set a base URL:
 
 ```bash
-BASE_URL=http://localhost:5000
+BASE_URL=https://localhost:5000
 ```
 
 Register:

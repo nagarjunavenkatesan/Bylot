@@ -1,6 +1,8 @@
 import fetch from 'node-fetch';
+import https from 'https';
 
-const BASE = 'http://localhost:5000';
+const agent = new https.Agent({ rejectUnauthorized: false });
+const BASE = 'https://localhost:5000';
 
 async function test(name, fn) {
     try {
@@ -23,6 +25,7 @@ async function run() {
                 email: 'nagarjunavenkatesan@gmail.com',
                 password: '@bvnd4014BV',
             }),
+            agent,
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || res.status);
@@ -40,7 +43,7 @@ async function run() {
         '/api/admin/products?limit=50',
     ]) {
         await test(path, async () => {
-            const res = await fetch(`${BASE}${path}`, { headers: authHeaders });
+            const res = await fetch(`${BASE}${path}`, { headers: authHeaders, agent });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
             console.log(`  -> ${path} OK`);

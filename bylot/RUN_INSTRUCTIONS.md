@@ -21,10 +21,10 @@ Open a **new** terminal window and run:
 ```bash
 npm run dev
 ```
-*You should see: `Local: http://localhost:5173/`.*
+*You should see: `Local: https://localhost:5173/`.*
 
 ### 3. Open in Browser
-Visit [http://localhost:5173](http://localhost:5173) to use the application.
+Visit [https://localhost:5173](https://localhost:5173) to use the application. Accept the self-signed certificate warning in your browser.
 
 ## Troubleshooting
 - **Database Error**: If the backend fails with a password error, check `server/.env` and ensure `DB_PASSWORD` matches your local PostgreSQL setup.

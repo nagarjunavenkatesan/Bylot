@@ -1,6 +1,8 @@
 import fetch from 'node-fetch';
+import https from 'https';
 
-const BASE_URL = 'http://localhost:5000/api';
+const agent = new https.Agent({ rejectUnauthorized: false });
+const BASE_URL = 'https://localhost:5000/api';
 
 async function testBackend() {
     console.log('Starting Backend Verification...');
@@ -15,7 +17,8 @@ async function testBackend() {
         const res = await fetch(`${BASE_URL}/auth/send-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone })
+            body: JSON.stringify({ phone }),
+            agent,
         });
         const data = await res.json();
         console.log('   Status:', res.status);
@@ -36,7 +39,8 @@ async function testBackend() {
         const res = await fetch(`${BASE_URL}/auth/verify-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, otp })
+            body: JSON.stringify({ phone, otp }),
+            agent,
         });
         const data = await res.json();
         console.log('   Status:', res.status);
@@ -58,7 +62,8 @@ async function testBackend() {
                 email,
                 phone,
                 password
-            })
+            }),
+            agent,
         });
         const data = await res.json();
         console.log('   Status:', res.status);
@@ -75,7 +80,8 @@ async function testBackend() {
         const res = await fetch(`${BASE_URL}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password }),
+            agent,
         });
         const data = await res.json();
         console.log('   Status:', res.status);

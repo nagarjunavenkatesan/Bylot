@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import './styles/GoogleSkillAnimations.css';
 
 :root {
   /* Ultra-Modern Color Palette */
@@ -64,22 +65,24 @@ body.dark-mode {
   --primary-light: #A5B4FC;
   --primary-dark: #6366F1;
   
-  --bg-body: #0B0F19;
-  --bg-surface: rgba(17, 24, 39, 0.5);
-  --bg-surface-hover: rgba(31, 41, 55, 0.8);
-  --bg-glass: rgba(17, 24, 39, 0.6);
-  --bg-solid: #111827;
+  /* Softer, higher-visibility background palette */
+  --bg-body: #141B2D;
+  --bg-surface: rgba(30, 41, 64, 0.85);
+  --bg-surface-hover: rgba(43, 58, 88, 0.95);
+  --bg-glass: rgba(26, 36, 56, 0.9);
+  --bg-solid: #1E293B;
 
-  --text-main: #F8FAFC;
-  --text-muted: #94A3B8;
-  --text-light: #64748B;
+  /* Brightened high-contrast text and label colors */
+  --text-main: #FFFFFF;
+  --text-muted: #E2E8F0;
+  --text-light: #CBD5E1;
 
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.8);
-  --shadow-glow: 0 0 30px rgba(129, 140, 248, 0.3);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 30px rgba(129, 140, 248, 0.35);
 
-  --border: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.16);
 }
 
 /* Base Styles */
@@ -213,6 +216,38 @@ body.dark-mode .glass {
   box-shadow: var(--shadow-glow);
 }
 
+/* Global Dropdown & Option Theme Styling */
+select, .category-select {
+  font-family: inherit;
+  color: var(--text-main);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  cursor: pointer;
+}
+
+select option, .category-select option {
+  background-color: #ffffff;
+  color: #0f172a;
+  padding: 10px 16px;
+  font-weight: 500;
+}
+
+body.dark-mode select option,
+body.dark-mode .category-select option {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
+select option:checked,
+select option:hover,
+.category-select option:checked,
+.category-select option:hover {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
 /* Animations */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
@@ -294,5 +329,21 @@ body.dark-mode .glass {
 /* Margin/Padding Utils */
 .mt-4 { margin-top: 1rem; }
 .mb-4 { margin-bottom: 1rem; }
+
+/* Accessibility & High Contrast Text Label Overrides */
+label, .form-label, .input-label, .distance-label {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: #94A3B8;
+}
+
+body.dark-mode .card-subtitle,
+body.dark-mode .loc-chip-btn {
+  color: var(--text-muted);
+}
 .text-center { text-align: center; }
 .text-primary { color: var(--primary); }

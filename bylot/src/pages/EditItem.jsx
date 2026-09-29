@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import PageTransition from '../components/PageTransition';
 import Loader from '../components/Loader';
 import { apiRequest } from '../api/backendApi';
@@ -20,13 +19,24 @@ const EditItem = () => {
         apiRequest(`/api/products/${id}`)
             .then(res => {
                 const d = res?.data || res;
+                let formattedExpiryDate = '';
+                if (d.expiry_date) {
+                    try {
+                        const dateObj = new Date(d.expiry_date);
+                        if (!isNaN(dateObj.getTime())) {
+                            formattedExpiryDate = dateObj.toISOString().split('T')[0];
+                        }
+                    } catch (_) {
+                        formattedExpiryDate = '';
+                    }
+                }
                 setFormData({
                     name: d.name || '',
                     description: d.description || '',
                     price: d.selling_price || d.price || '',
                     originalPrice: d.mrp || d.original_price || '',
                     category: d.category_name || d.category || 'Vegetables',
-                    expiryDate: d.expiry_date ? new Date(d.expiry_date).toISOString().split('T')[0] : '',
+                    expiryDate: formattedExpiryDate,
                     location: d.city || d.location || '',
                 });
             })
@@ -48,9 +58,11 @@ const EditItem = () => {
                 body: JSON.stringify({
                     name: formData.name,
                     description: formData.description,
-                    sellingPrice: Number(formData.price),
-                    mrp: Number(formData.originalPrice || formData.price),
+                    price: Number(formData.price),
+                    originalPrice: Number(formData.originalPrice || formData.price),
                     expiryDate: formData.expiryDate || undefined,
+                    category: formData.category,
+                    location: formData.location,
                     status: 'active',
                 }),
             });
@@ -67,7 +79,7 @@ const EditItem = () => {
         <PageTransition>
             <div className="container" style={{ padding: '2rem 1rem', maxWidth: '600px', margin: '0 auto' }}>
                 <h2 className="section-title">Edit Listing</h2>
-                <motion.form onSubmit={handleSubmit} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+                <form onSubmit={handleSubmit}
                     className="sell-form" style={{ background: 'var(--card-bg)', padding: '2rem', borderRadius: '1rem', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
                     <div className="form-group">
                         <label className="form-label">Product Name</label>
@@ -103,7 +115,7 @@ const EditItem = () => {
                     </div>
                     <button type="submit" className="btn btn-primary w-full" style={{ marginTop: '1rem' }}>Update Listing</button>
                     <button type="button" className="btn btn-secondary w-full" style={{ marginTop: '0.5rem' }} onClick={() => navigate('/profile')}>Cancel</button>
-                </motion.form>
+                </form>
             </div>
         </PageTransition>
     );

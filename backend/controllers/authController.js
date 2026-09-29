@@ -8,6 +8,9 @@ const { findUserByEmail, findUserById, createUser, saveRefreshToken } = require(
 const { verifyGoogleIdToken } = require("../services/googleAuthService");
 const { sendPasswordResetEmail } = require("../services/emailService");
 
+const accountLockout = require("../security/accountLockout");
+const tokenBlacklist = require("../security/tokenBlacklist");
+
 function authPayload(user, refreshToken) {
   return {
     user,
@@ -35,11 +38,20 @@ const register = asyncHandler(async (req, res) => {
 
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
+
+  const lockState = accountLockout.isLocked(email, clientIp, req);
+  if (lockState.locked) {
+    throw new AppError(`Account temporarily locked due to excessive failed attempts. Try again in ${lockState.remainingSeconds} seconds.`, 429);
+  }
+
   const user = await findUserByEmail(email);
   if (!user || user.status !== "active" || !(await comparePassword(password, user.password_hash))) {
+    accountLockout.recordFailure(email, clientIp, req);
     throw new AppError("Invalid email or password", 401);
   }
 
+  accountLockout.recordSuccess(email, clientIp, req);
   await pool.execute("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
   const publicUser = await findUserById(user.id);
   const data = await issueTokens(publicUser);
@@ -71,6 +83,9 @@ const googleLogin = asyncHandler(async (req, res) => {
 });
 
 const logout = asyncHandler(async (req, res) => {
+  if (req.token) {
+    tokenBlacklist.blacklist(req.token, Date.now() + 24 * 60 * 60 * 1000, req);
+  }
   await pool.execute("UPDATE users SET refresh_token_hash = NULL WHERE id = ?", [req.user.id]);
   return success(res, "Logout successful", null);
 });

@@ -421,6 +421,92 @@
     min-width: 860px;
 }
 
+.admin-id-search {
+    margin-bottom: 1.25rem;
+}
+
+.admin-id-search-input {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--bg-glass);
+    border: 1px solid rgba(150, 150, 150, 0.18);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 1rem;
+    color: var(--primary);
+}
+
+.admin-id-search-input input {
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-main);
+    font: inherit;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    letter-spacing: 0.05em;
+}
+
+.admin-id-search-btn {
+    min-height: 36px;
+    padding: 0.45rem 1rem;
+    border-radius: 10px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--gradient-primary);
+    border: 0;
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+}
+
+.admin-id-search-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.admin-id-result {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    background: var(--bg-glass);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    display: grid;
+    gap: 0.75rem;
+}
+
+.admin-id-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.admin-id-result-body {
+    display: grid;
+    gap: 0.25rem;
+    color: var(--text-main);
+}
+
+.admin-id-result-body strong {
+    font-size: 1.05rem;
+}
+
+.admin-id-result-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.admin-id-result-actions select {
+    padding: 0.45rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid rgba(150, 150, 150, 0.25);
+    background: var(--bg-solid);
+    color: var(--text-main);
+    font: inherit;
+    font-weight: 700;
+}
+
 @media (max-width: 760px) {
     .admin-hero {
         align-items: flex-start;

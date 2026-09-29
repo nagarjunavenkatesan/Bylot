@@ -17,7 +17,7 @@ for (const key of required) {
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 5000),
-  apiBaseUrl: process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`,
+  apiBaseUrl: process.env.API_BASE_URL || `https://localhost:${process.env.PORT || 5000}`,
   db: {
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 3306),
@@ -45,6 +45,7 @@ module.exports = {
     pass: process.env.SMTP_PASS,
     from: process.env.EMAIL_FROM || "Bylot <no-reply@bylot.com>"
   },
+  adminEmail: process.env.ADMIN_EMAIL || "",
   payment: {
     provider: process.env.PAYMENT_PROVIDER || "manual",
     webhookSecret: process.env.PAYMENT_WEBHOOK_SECRET || ""

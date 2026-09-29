@@ -25,22 +25,25 @@ const adminLogin = asyncHandler(async (req, res) => {
 
 const getAllUsers = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
+  const safeLimit = Math.max(1, Number(limit) || 20);
+  const safeOffset = Math.max(0, Number(offset) || 0);
   const [[count], [users]] = await Promise.all([
     pool.query("SELECT COUNT(*) AS total FROM users"),
-    pool.query("SELECT id, name, email, phone, role, status, created_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?", [limit, offset])
+    pool.query(`SELECT id, name, email, phone, role, status, created_at FROM users ORDER BY created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`)
   ]);
   return success(res, "Users fetched successfully", users, 200, buildMeta(count[0].total, page, limit));
 });
 
 const getSellers = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
+  const safeLimit = Math.max(1, Number(limit) || 20);
+  const safeOffset = Math.max(0, Number(offset) || 0);
   const [[count], [sellers]] = await Promise.all([
     pool.query("SELECT COUNT(*) AS total FROM sellers"),
     pool.query(
       `SELECT s.*, u.name, u.email, u.status AS user_status
        FROM sellers s JOIN users u ON u.id = s.user_id
-       ORDER BY s.created_at DESC LIMIT ? OFFSET ?`,
-      [limit, offset]
+       ORDER BY s.created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`
     )
   ]);
   return success(res, "Sellers fetched successfully", sellers, 200, buildMeta(count[0].total, page, limit));
@@ -72,16 +75,18 @@ const dashboardAnalytics = asyncHandler(async (req, res) => {
   ]);
 
   return success(res, "Dashboard analytics fetched successfully", {
-    totalUsers: users[0].total,
-    totalSellers: sellers[0].total,
-    totalProducts: products[0].total,
-    totalOrders: orders[0].total,
-    revenue: revenue[0].total
+    totalUsers: users[0]?.total || 0,
+    totalSellers: sellers[0]?.total || 0,
+    totalProducts: products[0]?.total || 0,
+    totalOrders: orders[0]?.total || 0,
+    revenue: revenue[0]?.total || 0
   });
 });
 
 const manageProducts = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
+  const safeLimit = Math.max(1, Number(limit) || 20);
+  const safeOffset = Math.max(0, Number(offset) || 0);
   const q = req.query.q ? req.query.q.trim() : '';
   let whereClause = '';
   let params = [];
@@ -100,8 +105,8 @@ const manageProducts = asyncHandler(async (req, res) => {
        JOIN categories c ON c.id = p.category_id
        JOIN sellers s ON s.id = p.seller_id
        ${whereClause}
-       ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+       ORDER BY p.created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`,
+      params
     )
   ]);
   return success(res, "Products fetched successfully", products, 200, buildMeta(count[0].total, page, limit));
@@ -123,26 +128,33 @@ const deleteProduct = asyncHandler(async (req, res) => {
 
 const getReports = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
+  const safeLimit = Math.max(1, Number(limit) || 20);
+  const safeOffset = Math.max(0, Number(offset) || 0);
   const statusFilter = req.query.status ? "WHERE r.status = ?" : "WHERE 1=1";
   const params = req.query.status ? [req.query.status] : [];
 
-  const [[count], [reports]] = await Promise.all([
-    pool.query(`SELECT COUNT(*) AS total FROM product_reports r ${statusFilter}`, params),
-    pool.query(
-      `SELECT r.*,
-              p.name AS product_name, p.image_url AS product_image,
-              u.name AS reporter_name, u.email AS reporter_email,
-              s.business_name AS seller_name
-       FROM product_reports r
-       JOIN products p ON p.id = r.product_id
-       JOIN users u    ON u.id = r.reporter_id
-       JOIN sellers s  ON s.id = p.seller_id
-       ${statusFilter}
-       ORDER BY r.created_at DESC LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
-    )
-  ]);
-  return success(res, "Reports fetched successfully", reports, 200, buildMeta(count[0].total, page, limit));
+  try {
+    const [[count], [reports]] = await Promise.all([
+      pool.query(`SELECT COUNT(*) AS total FROM product_reports r ${statusFilter}`, params),
+      pool.query(
+        `SELECT r.*,
+                p.name AS product_name, p.image_url AS product_image,
+                u.name AS reporter_name, u.email AS reporter_email,
+                s.business_name AS seller_name
+         FROM product_reports r
+         JOIN products p ON p.id = r.product_id
+         JOIN users u    ON u.id = r.reporter_id
+         JOIN sellers s  ON s.id = p.seller_id
+         ${statusFilter}
+         ORDER BY r.created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`,
+        params
+      )
+    ]);
+    return success(res, "Reports fetched successfully", reports, 200, buildMeta(count[0].total, page, limit));
+  } catch (err) {
+    console.warn("Product reports query fallback:", err.message);
+    return success(res, "Reports fetched successfully", [], 200, buildMeta(0, page, limit));
+  }
 });
 
 const resolveReport = asyncHandler(async (req, res) => {
@@ -194,6 +206,25 @@ const districtAnalytics = asyncHandler(async (req, res) => {
   return res.json({ success: true, message: "District analytics fetched", data: rows, totals });
 });
 
+const searchProductByItemId = asyncHandler(async (req, res) => {
+  const { product_item_id } = req.query;
+  if (!product_item_id) throw new AppError("product_item_id query parameter is required", 400);
+
+  const numericId = Number(String(product_item_id).replace(/\D/g, ''));
+  const [products] = await pool.query(
+    `SELECT p.*, c.name AS category_name, s.business_name AS seller_name
+     FROM products p
+     JOIN categories c ON c.id = p.category_id
+     JOIN sellers s ON s.id = p.seller_id
+     WHERE p.product_item_id = ? OR p.id = ?
+     LIMIT 1`,
+    [product_item_id, numericId || 0]
+  );
+
+  if (!products.length) throw new AppError("No product found with that ID", 404);
+  return success(res, "Product found", products[0]);
+});
+
 module.exports = {
   adminLogin,
   getAllUsers,
@@ -206,5 +237,6 @@ module.exports = {
   deleteProduct,
   districtAnalytics,
   getReports,
-  resolveReport
+  resolveReport,
+  searchProductByItemId
 };

@@ -17,6 +17,7 @@ router.patch("/users/:id/status", validators.idParam, validators.blockUser, vali
 router.get("/dashboard", controller.dashboardAnalytics);
 router.get("/district-analytics", controller.districtAnalytics);
 router.get("/products", controller.manageProducts);
+router.get("/products/by-id", controller.searchProductByItemId);
 router.patch("/products/:id/status", validators.idParam, validators.productStatus, validate, controller.updateProductStatus);
 router.delete("/products/:id", validators.idParam, validate, controller.deleteProduct);
 router.get("/reports", controller.getReports);

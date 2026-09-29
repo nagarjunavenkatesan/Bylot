@@ -32,7 +32,7 @@ const Profile = () => {
             }
             if (sellerId) {
                 const products = await fetchProducts({ sellerId });
-                setMyItems(products);
+                setMyItems(Array.isArray(products) ? products : []);
             }
         } catch (error) {
             console.error('Error fetching my items:', error);
