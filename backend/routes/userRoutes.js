@@ -10,6 +10,8 @@ const router = express.Router();
 router.use(authenticate);
 router.get("/profile", controller.getProfile);
 router.put("/profile", validators.updateProfile, validate, controller.updateProfile);
+router.post("/profile", validators.updateProfile, validate, controller.updateProfile);
+router.patch("/profile", validators.updateProfile, validate, controller.updateProfile);
 router.post("/profile/image", upload.single("profileImage"), controller.uploadProfileImage);
 
 module.exports = router;

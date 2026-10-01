@@ -1,3 +1,4 @@
+const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
@@ -21,21 +22,22 @@ async function start() {
     console.warn("Database connection warning (running in mock/standalone mode if DB is offline):", dbErr.message);
   }
 
+  const useHttps = process.env.NODE_USE_HTTPS === "true";
   const certDir = path.join(__dirname, "certs");
   const keyPath = path.join(certDir, "key.pem");
   const certPath = path.join(certDir, "cert.pem");
 
-  if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+  if (useHttps && fs.existsSync(keyPath) && fs.existsSync(certPath)) {
     const httpsOptions = {
       key: fs.readFileSync(keyPath),
       cert: fs.readFileSync(certPath),
     };
     https.createServer(httpsOptions, app).listen(env.port, () => {
-      console.log(`Bylot API running on https://localhost:${env.port}`);
+      console.log(`Bylot API running with TLS on https://localhost:${env.port}`);
     });
   } else {
-    app.listen(env.port, () => {
-      console.log(`Bylot API running on http://localhost:${env.port}`);
+    http.createServer(app).listen(env.port, () => {
+      console.log(`Bylot API running on http://localhost:${env.port} (Environment: ${env.nodeEnv})`);
     });
   }
 }

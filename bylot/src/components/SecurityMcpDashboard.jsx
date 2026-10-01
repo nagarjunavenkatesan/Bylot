@@ -4,12 +4,11 @@ import { API_BASE_URL } from '../api/backendApi';
 
 const SecurityMcpDashboard = () => {
     const [securityData, setSecurityData] = useState(null);
-    const [mcpManifest, setMcpManifest] = useState(null);
+    const [manifestName, setManifestName] = useState('');
     const [loading, setLoading] = useState(true);
     const [activeMcpTool, setActiveMcpTool] = useState('bylot_security_audit');
     const [mcpResult, setMcpResult] = useState(null);
     const [mcpLoading, setMcpLoading] = useState(false);
-    const [scanScore, setScanScore] = useState(100);
 
     const fetchSecurityStatus = async () => {
         setLoading(true);
@@ -18,8 +17,7 @@ const SecurityMcpDashboard = () => {
             const res = await fetch(`${API_BASE_URL}/api/security/status`, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                    'X-Bylot-Handshake': localStorage.getItem('bylot-handshake') || ''
+                    'Authorization': `Bearer ${token}`
                 }
             });
             const data = await res.json();
@@ -38,7 +36,7 @@ const SecurityMcpDashboard = () => {
             const res = await fetch(`${API_BASE_URL}/mcp/manifest`);
             const data = await res.json();
             if (data.success) {
-                setMcpManifest(data.data);
+                setManifestName(data.data?.name || 'bylot-mcp-server');
             }
         } catch (err) {
             console.error('Failed to load MCP manifest:', err);
@@ -49,11 +47,12 @@ const SecurityMcpDashboard = () => {
         setMcpLoading(true);
         setActiveMcpTool(toolName);
         try {
+            const token = localStorage.getItem('accessToken');
             const res = await fetch(`${API_BASE_URL}/mcp/tools/${toolName}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Bylot-Handshake': localStorage.getItem('bylot-handshake') || ''
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({})
             });
@@ -176,7 +175,7 @@ const SecurityMcpDashboard = () => {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                     <FaTerminal style={{ fontSize: '1.4rem', color: '#8B5CF6' }} />
-                    <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Model Context Protocol (MCP) Live Sandbox</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Model Context Protocol (MCP) Live Sandbox{manifestName ? ` (${manifestName})` : ''}</h3>
                 </div>
 
                 <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', marginBottom: '1rem' }}>

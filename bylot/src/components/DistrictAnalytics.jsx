@@ -42,14 +42,13 @@ function DistrictBarChart({ title, rows = [], valueKey, countKey, color }) {
 }
 
 const DistrictAnalytics = ({ rows = [], totals = null, loading = false }) => {
-    const safeRows = Array.isArray(rows) ? rows : [];
     const sellRows = useMemo(
-        () => [...safeRows].sort((a, b) => (Number(b?.sellCount) || 0) - (Number(a?.sellCount) || 0) || String(a?.district || '').localeCompare(String(b?.district || ''))),
-        [safeRows]
+        () => (Array.isArray(rows) ? [...rows] : []).sort((a, b) => (Number(b?.sellCount) || 0) - (Number(a?.sellCount) || 0) || String(a?.district || '').localeCompare(String(b?.district || ''))),
+        [rows]
     );
     const buyRows = useMemo(
-        () => [...safeRows].sort((a, b) => (Number(b?.buyCount) || 0) - (Number(a?.buyCount) || 0) || String(a?.district || '').localeCompare(String(b?.district || ''))),
-        [safeRows]
+        () => (Array.isArray(rows) ? [...rows] : []).sort((a, b) => (Number(b?.buyCount) || 0) - (Number(a?.buyCount) || 0) || String(a?.district || '').localeCompare(String(b?.district || ''))),
+        [rows]
     );
 
     if (loading) {

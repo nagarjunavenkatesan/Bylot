@@ -1,4 +1,6 @@
 // API_BASE_URL resolves all backend requests and image URLs.
+// In development, it falls back to empty string for Vite proxy (/api -> backend).
+// In production behind Nginx, requests use relative /api paths on the same domain.
 const DEFAULT_BACKEND_URL = '';
 
 export const API_BASE_URL = (
@@ -6,9 +8,9 @@ export const API_BASE_URL = (
     DEFAULT_BACKEND_URL
 ).replace(/\/$/, '');
 
-const API_KEY = import.meta.env.VITE_BYLOT_API_KEY || '';
+export const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
-// Sample fallback mock products to ensure zero downtime when offline or demo deployment
+// Sample fallback mock products for explicit demo/mock mode
 export const SAMPLE_PRODUCTS = [
     {
         id: 1,
@@ -19,7 +21,7 @@ export const SAMPLE_PRODUCTS = [
         mrp: 65,
         selling_price: 32,
         expiry: 'Tomorrow (Fresh)',
-        expiry_date: '2026-09-05',
+        expiry_date: '2026-10-02',
         location: 'Anna Nagar, Chennai',
         city: 'Chennai',
         distance: 1.4,
@@ -38,7 +40,7 @@ export const SAMPLE_PRODUCTS = [
         mrp: 50,
         selling_price: 25,
         expiry: 'In 2 days',
-        expiry_date: '2026-09-06',
+        expiry_date: '2026-10-03',
         location: 'Indiranagar, Bangalore',
         city: 'Bangalore',
         distance: 2.8,
@@ -57,7 +59,7 @@ export const SAMPLE_PRODUCTS = [
         mrp: 40,
         selling_price: 18,
         expiry: 'In 3 days',
-        expiry_date: '2026-09-07',
+        expiry_date: '2026-10-04',
         location: 'T. Nagar, Chennai',
         city: 'Chennai',
         distance: 3.5,
@@ -76,7 +78,7 @@ export const SAMPLE_PRODUCTS = [
         mrp: 220,
         selling_price: 120,
         expiry: 'In 2 days',
-        expiry_date: '2026-09-06',
+        expiry_date: '2026-10-03',
         location: 'Bandra, Mumbai',
         city: 'Mumbai',
         distance: 4.2,
@@ -95,7 +97,7 @@ export const SAMPLE_PRODUCTS = [
         mrp: 90,
         selling_price: 45,
         expiry: 'In 3 days',
-        expiry_date: '2026-09-07',
+        expiry_date: '2026-10-04',
         location: 'Connaught Place, Delhi',
         city: 'Delhi',
         distance: 5.1,
@@ -114,7 +116,7 @@ export const SAMPLE_PRODUCTS = [
         mrp: 150,
         selling_price: 70,
         expiry: 'Tomorrow',
-        expiry_date: '2026-09-05',
+        expiry_date: '2026-10-02',
         location: 'Jubilee Hills, Hyderabad',
         city: 'Hyderabad',
         distance: 6.0,
@@ -133,7 +135,7 @@ export const SAMPLE_PRODUCTS = [
         mrp: 180,
         selling_price: 95,
         expiry: 'In 15 days',
-        expiry_date: '2026-09-20',
+        expiry_date: '2026-10-16',
         location: 'Kothrud, Pune',
         city: 'Pune',
         distance: 2.1,
@@ -152,7 +154,7 @@ export const SAMPLE_PRODUCTS = [
         mrp: 450,
         selling_price: 150,
         expiry: 'In 7 days',
-        expiry_date: '2026-09-12',
+        expiry_date: '2026-10-08',
         location: 'Salt Lake Sector V, Kolkata',
         city: 'Kolkata',
         distance: 3.8,
@@ -171,10 +173,7 @@ export async function apiRequest(path, options = {}) {
 
     const headers = {
         Accept: 'application/json',
-        'X-Bylot-Handshake': localStorage.getItem('bylot-handshake') || '',
-        'X-CSRF-Token': localStorage.getItem('bylot-csrf-token') || localStorage.getItem('bylot-handshake') || '',
         ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-        ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
         ...options.headers,
     };
 
@@ -201,10 +200,105 @@ export async function apiRequest(path, options = {}) {
 }
 
 // ---------- image URL resolver ----------
-function resolveImageUrl(image) {
+export function resolveImageUrl(image) {
     if (!image) return 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
     if (image.startsWith('http://') || image.startsWith('https://')) return image;
     return `${API_BASE_URL}/${image.replace(/^\/+/, '')}`;
+}
+
+// ---------- calculate robust expiry metadata ----------
+export function calculateExpiryInfo(expiryDateStr, fallbackLabel) {
+    if (!expiryDateStr && fallbackLabel) {
+        return {
+            formattedDate: fallbackLabel,
+            status: fallbackLabel.toLowerCase().includes('fresh') ? 'Fresh' : 'Expiring Soon',
+            badgeClass: fallbackLabel.toLowerCase().includes('fresh') ? 'fresh' : 'expiring-soon',
+            daysRemaining: null,
+            isExpired: false
+        };
+    }
+
+    if (!expiryDateStr) {
+        return {
+            formattedDate: 'Date not specified',
+            status: 'Unknown',
+            badgeClass: 'unknown',
+            daysRemaining: null,
+            isExpired: false
+        };
+    }
+
+    try {
+        const expDate = new Date(expiryDateStr);
+        if (isNaN(expDate.getTime())) {
+            return {
+                formattedDate: String(expiryDateStr),
+                status: 'Unknown',
+                badgeClass: 'unknown',
+                daysRemaining: null,
+                isExpired: false
+            };
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const target = new Date(expDate);
+        target.setHours(0, 0, 0, 0);
+
+        const diffTime = target.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const formattedDate = expDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+
+        if (diffDays < 0) {
+            return {
+                formattedDate,
+                status: 'Expired',
+                badgeClass: 'expired',
+                daysRemaining: diffDays,
+                isExpired: true
+            };
+        } else if (diffDays === 0) {
+            return {
+                formattedDate: 'Expires Today',
+                status: 'Near Expiry',
+                badgeClass: 'near-expiry',
+                daysRemaining: 0,
+                isExpired: false
+            };
+        } else if (diffDays <= 3) {
+            return {
+                formattedDate: `In ${diffDays} day${diffDays > 1 ? 's' : ''}`,
+                status: 'Near Expiry',
+                badgeClass: 'near-expiry',
+                daysRemaining: diffDays,
+                isExpired: false
+            };
+        } else if (diffDays <= 7) {
+            return {
+                formattedDate: `In ${diffDays} days`,
+                status: 'Expiring Soon',
+                badgeClass: 'expiring-soon',
+                daysRemaining: diffDays,
+                isExpired: false
+            };
+        } else {
+            return {
+                formattedDate,
+                status: 'Fresh',
+                badgeClass: 'fresh',
+                daysRemaining: diffDays,
+                isExpired: false
+            };
+        }
+    } catch {
+        return {
+            formattedDate: String(expiryDateStr),
+            status: 'Unknown',
+            badgeClass: 'unknown',
+            daysRemaining: null,
+            isExpired: false
+        };
+    }
 }
 
 // ---------- product normalizer ----------
@@ -213,18 +307,8 @@ export function normalizeProduct(product) {
     const product_item_id = product.product_item_id
         || product.productItemId
         || (product.id ? `PRD-${String(product.id).padStart(6, '0')}` : 'PRD-000000');
-    
-    let formattedExpiry = 'N/A';
-    if (product.expiry) {
-        formattedExpiry = product.expiry;
-    } else if (product.expiry_date) {
-        try {
-            const dateObj = new Date(product.expiry_date);
-            formattedExpiry = !isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString() : String(product.expiry_date);
-        } catch (_) {
-            formattedExpiry = String(product.expiry_date);
-        }
-    }
+
+    const expiryInfo = calculateExpiryInfo(product.expiry_date, product.expiry);
 
     return {
         ...product,
@@ -234,7 +318,11 @@ export function normalizeProduct(product) {
         price: Number(product.price ?? product.selling_price ?? 0),
         originalPrice: product.originalPrice ?? product.original_price ?? product.mrp ?? null,
         image: resolveImageUrl(product.image ?? product.image_url),
-        expiry: formattedExpiry,
+        expiry: expiryInfo.formattedDate,
+        expiryStatus: expiryInfo.status,
+        expiryBadgeClass: expiryInfo.badgeClass,
+        isExpired: expiryInfo.isExpired,
+        daysRemaining: expiryInfo.daysRemaining,
         location: product.location ?? product.city ?? product.address_line1 ?? 'Available from Bylot seller',
         distance: product.distance != null ? Number(product.distance) : (product.distance_km != null ? Number(product.distance_km) : null),
         category: product.category ?? product.category_name ?? 'All',
@@ -292,11 +380,19 @@ export async function fetchProducts(params = {}) {
             return normalized;
         }
     } catch (err) {
-        console.warn('Backend API request failed, using sample product dataset fallback:', err.message);
+        if (IS_DEMO_MODE) {
+            console.warn('Backend API request failed, using sample product dataset fallback (demo mode):', err.message);
+            const fallback = SAMPLE_PRODUCTS.map(normalizeProduct).filter(Boolean);
+            return fallback;
+        }
+        // In production, do not mask real errors with fake products
+        throw err;
     }
-    // Fallback to sample items
-    const fallback = SAMPLE_PRODUCTS.map(normalizeProduct).filter(Boolean);
-    return fallback;
+
+    if (IS_DEMO_MODE) {
+        return SAMPLE_PRODUCTS.map(normalizeProduct).filter(Boolean);
+    }
+    return [];
 }
 
 export async function fetchNearbyProducts(lat, lng, radius = 10) {
@@ -314,15 +410,18 @@ export async function fetchNearbyProducts(lat, lng, radius = 10) {
         const response = await apiRequest(`/api/products/nearby?${params}`);
         const data = response?.data ?? response;
         if (Array.isArray(data) && data.length > 0) {
-            const normalized = data.map(normalizeProduct);
+            const normalized = data.map(normalizeProduct).filter(Boolean);
             setCached(cacheKey, normalized);
             return normalized;
         }
     } catch (err) {
-        console.warn('Nearby products request failed, calculating fallback distances:', err.message);
+        if (IS_DEMO_MODE) {
+            console.warn('Nearby products request failed, calculating fallback distances (demo mode):', err.message);
+            return fetchProducts({ latitude: lat, longitude: lng });
+        }
+        throw err;
     }
 
-    // Fallback — load products with calculated sample distance
     return fetchProducts({ latitude: lat, longitude: lng });
 }
 
@@ -340,11 +439,15 @@ export async function fetchProductById(id) {
             return normalized;
         }
     } catch (err) {
-        console.warn(`Product ID ${id} request failed, looking up fallback:`, err.message);
+        if (IS_DEMO_MODE) {
+            console.warn(`Product ID ${id} request failed, looking up fallback:`, err.message);
+            const found = SAMPLE_PRODUCTS.find(p => String(p.id) === String(id));
+            return normalizeProduct(found || SAMPLE_PRODUCTS[0]);
+        }
+        throw err;
     }
 
-    const found = SAMPLE_PRODUCTS.find(p => String(p.id) === String(id));
-    return normalizeProduct(found || SAMPLE_PRODUCTS[0]);
+    throw new Error('Product not found');
 }
 
 // ---------- admin ----------
@@ -366,5 +469,3 @@ export async function uploadProduct(formData) {
         body: formData,
     });
 }
-
-

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const LocationContext = createContext(null);
 
@@ -12,99 +12,147 @@ export const PRESET_CITIES = [
     { name: 'Pune',      latitude: 18.5204, longitude: 73.8567 }
 ];
 
-export const LocationProvider = ({ children }) => {
-    const [coords, setCoords]     = useState(null);
-    const [status, setStatus]     = useState('prompt'); // 'prompt' | 'granted' | 'denied' | 'manual'
-    const [loading, setLoading]   = useState(true);
-    const [cityName, setCityName] = useState('');
+function getInitialLocationState() {
+    try {
+        const savedStatus = localStorage.getItem('bylot_location_status');
+        const savedCoords = localStorage.getItem('bylot_coords');
+        const savedCity   = localStorage.getItem('bylot_manual_city');
 
-    const requestLocation = () => {
-        setLoading(true);
+        if (savedStatus === 'granted' && savedCoords) {
+            return {
+                coords: JSON.parse(savedCoords),
+                status: 'granted',
+                cityName: 'GPS Location',
+                loading: false
+            };
+        }
+
+        if (savedStatus === 'manual' && savedCoords && savedCity) {
+            return {
+                coords: JSON.parse(savedCoords),
+                status: 'manual',
+                cityName: savedCity,
+                loading: false
+            };
+        }
+
+        if (savedStatus === 'denied') {
+            return {
+                coords: null,
+                status: 'denied',
+                cityName: '',
+                loading: false
+            };
+        }
+    } catch {
+        // Fall back to prompt
+    }
+
+    return {
+        coords: null,
+        status: 'prompt',
+        cityName: '',
+        loading: false
+    };
+}
+
+export const LocationProvider = ({ children }) => {
+    const [locationState, setLocationState] = useState(getInitialLocationState);
+
+    const requestLocation = useCallback(() => {
+        setLocationState((prev) => ({ ...prev, loading: true }));
 
         if (!navigator.geolocation) {
-            // No geolocation support — just finish loading, don't block
-            setStatus('denied');
-            setLoading(false);
+            setLocationState({
+                coords: null,
+                status: 'denied',
+                cityName: '',
+                loading: false
+            });
             return;
         }
 
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const newCoords = {
-                    latitude:  position.coords.latitude,
+                    latitude: position.coords.latitude,
                     longitude: position.coords.longitude
                 };
-                setCoords(newCoords);
-                setStatus('granted');
-                setCityName('GPS Location');
-                setLoading(false);
+                setLocationState({
+                    coords: newCoords,
+                    status: 'granted',
+                    cityName: 'GPS Location',
+                    loading: false
+                });
                 localStorage.setItem('bylot_location_status', 'granted');
                 localStorage.setItem('bylot_coords', JSON.stringify(newCoords));
                 localStorage.removeItem('bylot_manual_city');
             },
             () => {
-                // Denied or unavailable — silently fall back, NEVER block the page
-                setStatus('denied');
-                setLoading(false);
+                setLocationState({
+                    coords: null,
+                    status: 'denied',
+                    cityName: '',
+                    loading: false
+                });
                 localStorage.setItem('bylot_location_status', 'denied');
             },
             { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
         );
-    };
+    }, []);
 
-    const setManualLocation = (city) => {
+    const setManualLocation = useCallback((city) => {
         const newCoords = { latitude: city.latitude, longitude: city.longitude };
-        setCoords(newCoords);
-        setStatus('manual');
-        setCityName(city.name);
-        setLoading(false);
+        setLocationState({
+            coords: newCoords,
+            status: 'manual',
+            cityName: city.name,
+            loading: false
+        });
         localStorage.setItem('bylot_location_status', 'manual');
         localStorage.setItem('bylot_coords', JSON.stringify(newCoords));
         localStorage.setItem('bylot_manual_city', city.name);
-    };
+    }, []);
 
     useEffect(() => {
         const savedStatus = localStorage.getItem('bylot_location_status');
-        const savedCoords = localStorage.getItem('bylot_coords');
-        const savedCity   = localStorage.getItem('bylot_manual_city');
-
-        if (savedStatus === 'granted' && savedCoords) {
-            try {
-                setCoords(JSON.parse(savedCoords));
-                setStatus('granted');
-                setCityName('GPS Location');
-                setLoading(false);
-                return;
-            } catch (_) { /* fall through */ }
+        if (!savedStatus && typeof navigator !== 'undefined' && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const newCoords = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    };
+                    setLocationState({
+                        coords: newCoords,
+                        status: 'granted',
+                        cityName: 'GPS Location',
+                        loading: false
+                    });
+                    localStorage.setItem('bylot_location_status', 'granted');
+                    localStorage.setItem('bylot_coords', JSON.stringify(newCoords));
+                    localStorage.removeItem('bylot_manual_city');
+                },
+                () => {
+                    setLocationState({
+                        coords: null,
+                        status: 'denied',
+                        cityName: '',
+                        loading: false
+                    });
+                    localStorage.setItem('bylot_location_status', 'denied');
+                },
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+            );
         }
-
-        if (savedStatus === 'manual' && savedCoords && savedCity) {
-            try {
-                setCoords(JSON.parse(savedCoords));
-                setStatus('manual');
-                setCityName(savedCity);
-                setLoading(false);
-                return;
-            } catch (_) { /* fall through */ }
-        }
-
-        if (savedStatus === 'denied') {
-            // Already denied before — don't ask again, just finish loading
-            setStatus('denied');
-            setLoading(false);
-            return;
-        }
-
-        // First visit — try to get location silently
-        requestLocation();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <LocationContext.Provider value={{
-            coords,
-            status,
-            loading,
-            cityName,
+            coords: locationState.coords,
+            status: locationState.status,
+            loading: locationState.loading,
+            cityName: locationState.cityName,
             requestLocation,
             setManualLocation
         }}>

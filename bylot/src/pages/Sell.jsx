@@ -41,7 +41,7 @@ const Sell = () => {
             let current = {};
             try {
                 current = JSON.parse(localStorage.getItem('user') || '{}');
-            } catch (_) {
+            } catch {
                 current = {};
             }
             const updatedUser = { ...current, phone: phoneNumber };

@@ -7,6 +7,8 @@ const accountLockout = require("../security/accountLockout");
 const tokenBlacklist = require("../security/tokenBlacklist");
 const runSecurityAudit = require("../scripts/securityAudit");
 
+const { authenticate, authorize } = require("../middleware/authMiddleware");
+
 // GET /mcp/manifest - MCP Capability Description
 router.get("/manifest", (req, res) => {
   res.json({
@@ -34,7 +36,10 @@ router.get("/manifest", (req, res) => {
   });
 });
 
-// POST /mcp/tools/:toolName - Call MCP tool over HTTP
+// Protect all MCP tool execution routes with Admin authentication
+router.use("/tools", authenticate, authorize("admin"));
+
+// POST /mcp/tools/:toolName - Call MCP tool over HTTP (Admin Only)
 router.post("/tools/:toolName", async (req, res) => {
   const { toolName } = req.params;
   const args = req.body || {};

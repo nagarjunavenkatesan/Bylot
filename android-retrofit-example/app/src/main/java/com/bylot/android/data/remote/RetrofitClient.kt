@@ -13,7 +13,9 @@ import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
 object RetrofitClient {
-    const val BASE_URL = "https://192.168.1.5:5000/"
+    // Production default: https://bylot.in/api/
+    // For local emulator development against your PC, use "http://10.0.2.2:5000/api/"
+    const val BASE_URL = "https://bylot.in/api/"
     private const val API_KEY = "07dad0dd8d8e9ce8ffb28f53bd4156b75b2a61e22ee67c8fa4c4bca0a93a14c0"
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {

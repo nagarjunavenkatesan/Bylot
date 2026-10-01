@@ -26,7 +26,7 @@ const EditItem = () => {
                         if (!isNaN(dateObj.getTime())) {
                             formattedExpiryDate = dateObj.toISOString().split('T')[0];
                         }
-                    } catch (_) {
+                    } catch {
                         formattedExpiryDate = '';
                     }
                 }

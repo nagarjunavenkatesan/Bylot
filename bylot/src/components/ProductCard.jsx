@@ -14,13 +14,14 @@ const REPORT_REASONS = [
 ];
 
 const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => {
-    if (!product) return null;
-
+    // Hooks must be called unconditionally on every render
     const [showReport, setShowReport]     = useState(false);
     const [reason, setReason]             = useState('fake_product');
     const [description, setDescription]  = useState('');
     const [reporting, setReporting]       = useState(false);
     const [reported, setReported]         = useState(false);
+
+    if (!product) return null;
 
     const handleReport = async (e) => {
         e.preventDefault();
@@ -57,6 +58,9 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
     const distNum = product.distance != null ? Number(product.distance) : null;
     const hasValidDistance = distNum != null && !isNaN(distNum);
 
+    const isExpired = product.isExpired || product.expiryStatus === 'Expired';
+    const isNearExpiry = product.expiryStatus === 'Near Expiry' || product.expiryStatus === 'Expiring Soon';
+
     return (
         <Card className="listing-card google-skill-card">
             <div className="google-card-accent-bar" />
@@ -71,7 +75,20 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
                         decoding="async"
                         onError={e => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'; }}
                     />
-                    <span className="expiry-tag">Expires: {product.expiry || 'N/A'}</span>
+                    <span
+                        className="expiry-tag"
+                        style={{
+                            backgroundColor: isExpired
+                                ? 'rgba(220, 38, 38, 0.9)'
+                                : isNearExpiry
+                                ? 'rgba(217, 119, 6, 0.9)'
+                                : 'rgba(16, 185, 129, 0.9)',
+                            color: '#ffffff',
+                            fontWeight: 700
+                        }}
+                    >
+                        {isExpired ? '⚠️ Expired: ' : 'Expires: '}{product.expiry || 'N/A'}
+                    </span>
                     {hasValidDistance && (
                         <span className="distance-tag">{distNum.toFixed(1)} km away</span>
                     )}
@@ -86,10 +103,22 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
             {/* Product details */}
             <div className="listing-details">
                 <Link to={`/product/${product.id}`} style={{ display: 'block', color: 'inherit' }}>
-                    <div style={{ marginBottom: '0.35rem' }}>
+                    <div style={{ marginBottom: '0.35rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.72rem', fontWeight: '800', color: 'var(--primary)', background: 'rgba(99, 102, 241, 0.14)', padding: '2px 7px', borderRadius: '6px', display: 'inline-block' }}>
                             Item ID: {product.product_item_id || `#${product.id}`}
                         </span>
+                        {product.expiryStatus && (
+                            <span style={{
+                                fontSize: '0.72rem',
+                                fontWeight: '700',
+                                padding: '2px 7px',
+                                borderRadius: '6px',
+                                backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.15)' : isNearExpiry ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                color: isExpired ? '#dc2626' : isNearExpiry ? '#d97706' : '#059669'
+                            }}>
+                                {product.expiryStatus}
+                            </span>
+                        )}
                     </div>
                     <h3 className="card-title">{product.name}</h3>
                     <p className="card-subtitle">{product.location}</p>
@@ -111,7 +140,7 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
                         )}
                         <button
                             className="btn w-full"
-                            onClick={e => { e.preventDefault(); e.stopPropagation(); isAdmin && onAdminDelete ? onAdminDelete(product.id) : onDelete && onDelete(product.id); }}
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); if (isAdmin && onAdminDelete) onAdminDelete(product.id); else if (onDelete) onDelete(product.id); }}
                             style={{ padding: '6px 12px', fontSize: '0.85rem', background: '#ef4444', color: 'white', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
                             <FaTrash style={{ marginRight: '5px' }} /> Delete
@@ -138,33 +167,38 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
 
                                 {showReport && (
                                     <form
-                                        className="report-form"
-                                        onSubmit={handleReport}
+                                        className="report-fraud-form"
                                         onClick={e => e.stopPropagation()}
+                                        onSubmit={handleReport}
                                     >
+                                        <p className="report-form-title">🚩 Flag this listing for admin review</p>
+
+                                        <label htmlFor={`reason-${product.id}`}>Reason for reporting</label>
                                         <select
+                                            id={`reason-${product.id}`}
                                             value={reason}
                                             onChange={e => setReason(e.target.value)}
-                                            className="report-select"
-                                            required
                                         >
                                             {REPORT_REASONS.map(r => (
                                                 <option key={r.value} value={r.value}>{r.label}</option>
                                             ))}
                                         </select>
+
+                                        <label htmlFor={`desc-${product.id}`}>Additional details (optional)</label>
                                         <textarea
+                                            id={`desc-${product.id}`}
+                                            rows={2}
                                             value={description}
                                             onChange={e => setDescription(e.target.value)}
-                                            className="report-textarea"
-                                            placeholder="Optional: add more details..."
-                                            rows={2}
+                                            placeholder="Provide more context for admins..."
                                             maxLength={500}
                                         />
+
                                         <div className="report-form-actions">
                                             <button
                                                 type="button"
                                                 className="report-cancel-btn"
-                                                onClick={e => { e.stopPropagation(); setShowReport(false); }}
+                                                onClick={() => setShowReport(false)}
                                             >
                                                 Cancel
                                             </button>
@@ -173,7 +207,7 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
                                                 className="report-submit-btn"
                                                 disabled={reporting}
                                             >
-                                                {reporting ? 'Sending...' : 'Send Report'}
+                                                {reporting ? 'Submitting...' : 'Submit Report'}
                                             </button>
                                         </div>
                                     </form>
@@ -187,4 +221,4 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
     );
 };
 
-export default React.memo(ProductCard);
+export default ProductCard;

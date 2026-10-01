@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import ProductCard from '../components/ProductCard';
 import PageTransition from '../components/PageTransition';
 import { useAuth } from '../context/AuthContext';
@@ -17,17 +16,17 @@ const Profile = () => {
             navigate('/login');
             return;
         }
-        fetchMyItems(user.id);
+        fetchMyItems();
     }, [user, navigate]);
 
-    const fetchMyItems = async (userId) => {
+    const fetchMyItems = async () => {
         try {
             // First get the seller profile to find the seller table ID
             let sellerId = null;
             try {
                 const sellerRes = await apiRequest('/api/sellers/profile');
                 sellerId = sellerRes?.data?.id || null;
-            } catch (_) {
+            } catch {
                 // user is not a seller — no products to show
             }
             if (sellerId) {

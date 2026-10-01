@@ -16,7 +16,7 @@ const ProductDetails = () => {
         if (userStr) {
             try {
                 setCurrentUser(JSON.parse(userStr));
-            } catch (_) {
+            } catch {
                 localStorage.removeItem('user');
             }
         }

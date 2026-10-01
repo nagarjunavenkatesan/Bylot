@@ -1,8 +1,13 @@
 node_modules/
 dist/
+build/
 .env
+.env.*
+!.env.example
 *.log
 uploads/
 .DS_Store
 Thumbs.db
 backend/certs/
+*.pem
+*.key
