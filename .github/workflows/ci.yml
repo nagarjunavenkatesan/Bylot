@@ -1,0 +1,119 @@
+name: Bylot CI/CD
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  backend:
+    name: Backend Lint, Audit, Test & Security
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || 'ci_test_password_change_me' }}
+          MYSQL_DATABASE: bylot_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+
+    env:
+      CI_MYSQL_PWD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || 'ci_test_password_change_me' }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Block Telegram code
+        run: |
+          if git grep -i -E "telegram|botfather|bot_token|api\.telegram" -- ":!*.test.js"; then
+            echo "Telegram references found"
+            exit 1
+          else
+            echo "No Telegram references"
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: backend
+        run: npm ci || npm install
+
+      - name: Lint Backend
+        working-directory: backend
+        run: npm run lint
+
+      - name: Security Audit (Production Dependencies)
+        working-directory: backend
+        run: npm audit --omit=dev
+
+      - name: Initialize test database
+        working-directory: backend
+        env:
+          MYSQL_PWD: ${{ env.CI_MYSQL_PWD }}
+        run: |
+          mysql -h 127.0.0.1 -u root -e "CREATE DATABASE IF NOT EXISTS bylot_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+          mysql -h 127.0.0.1 -u root bylot_test < config/schema.sql
+          DB_HOST=127.0.0.1 DB_PORT=3306 DB_USER=root DB_PASSWORD="$CI_MYSQL_PWD" DB_NAME=bylot_test node scripts/migrate.js --db bylot_test
+
+      - name: Run Backend Tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
+          DB_NAME: bylot_test
+          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
+          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
+          SESSION_SECRET: ci_test_super_secret_session_key_minimum_32_chars!
+        run: npm test
+
+      - name: Security audit script
+        working-directory: backend
+        run: npm run security-audit
+
+  frontend:
+    name: Frontend Lint, Audit, Build & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: bylot/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: bylot
+        run: npm ci || npm install
+
+      - name: Lint Frontend
+        working-directory: bylot
+        run: npm run lint
+
+      - name: Security Audit (Production Dependencies)
+        working-directory: bylot
+        run: npm audit --omit=dev
+
+      - name: Pricing unit tests
+        working-directory: bylot
+        run: npm run test
+
+      - name: Build Frontend Bundle
+        working-directory: bylot
+        run: npm run build

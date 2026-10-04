@@ -1,17 +1,33 @@
 const http = require("http");
 const https = require("https");
 const fs = require("fs");
-const path = require("path");
 const app = require("./app");
 const env = require("./config/env");
 const { pingDatabase } = require("./config/db");
 
-// Process safety handlers — prevent Node server crashes from unhandled errors
-process.on('uncaughtException', (err) => {
-  console.error('SERVER UNCAUGHT EXCEPTION:', err);
+let serverInstance = null;
+
+function gracefulShutdown(err) {
+  console.error("FATAL PROCESS ERROR:", err);
+  if (serverInstance) {
+    serverInstance.close(() => {
+      console.error("Server closed due to fatal error. Exiting process.");
+      process.exit(1);
+    });
+    // Force exit if close hangs
+    setTimeout(() => process.exit(1), 5000).unref();
+  } else {
+    process.exit(1);
+  }
+}
+
+// Process safety handlers — exit non-zero on fatal errors so supervisor/docker can restart cleanly
+process.on("uncaughtException", (err) => {
+  gracefulShutdown(err);
 });
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('SERVER UNHANDLED REJECTION:', reason);
+
+process.on("unhandledRejection", (reason) => {
+  gracefulShutdown(reason instanceof Error ? reason : new Error(String(reason)));
 });
 
 async function start() {
@@ -19,25 +35,29 @@ async function start() {
     await pingDatabase();
     console.log("MySQL Database connected successfully.");
   } catch (dbErr) {
-    console.warn("Database connection warning (running in mock/standalone mode if DB is offline):", dbErr.message);
+    if (env.nodeEnv === "production") {
+      console.error("[FATAL] Database connection failed in production. Refusing to start:", dbErr.message);
+      process.exit(1);
+    } else {
+      console.warn("Database connection warning (development mode):", dbErr.message);
+    }
   }
 
   const useHttps = process.env.NODE_USE_HTTPS === "true";
-  const certDir = path.join(__dirname, "certs");
-  const keyPath = path.join(certDir, "key.pem");
-  const certPath = path.join(certDir, "cert.pem");
+  const keyPath = process.env.TLS_KEY_PATH;
+  const certPath = process.env.TLS_CERT_PATH;
 
-  if (useHttps && fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+  if (useHttps && keyPath && certPath && fs.existsSync(keyPath) && fs.existsSync(certPath)) {
     const httpsOptions = {
       key: fs.readFileSync(keyPath),
       cert: fs.readFileSync(certPath),
     };
-    https.createServer(httpsOptions, app).listen(env.port, () => {
+    serverInstance = https.createServer(httpsOptions, app).listen(env.port, () => {
       console.log(`Bylot API running with TLS on https://localhost:${env.port}`);
     });
   } else {
-    http.createServer(app).listen(env.port, () => {
-      console.log(`Bylot API running on http://localhost:${env.port} (Environment: ${env.nodeEnv})`);
+    serverInstance = http.createServer(app).listen(env.port, () => {
+      console.log(`Bylot API running on http://localhost:${env.port} (Environment: ${env.nodeEnv}, Trust Proxy Hops: ${env.trustProxyHops})`);
     });
   }
 }

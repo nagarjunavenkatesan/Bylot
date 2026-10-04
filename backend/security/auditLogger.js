@@ -21,7 +21,7 @@ class AuditLogger {
         this.inMemoryLogs = lines.slice(-this.maxMemoryLogs).map((line) => {
           try {
             return JSON.parse(line);
-          } catch (e) {
+          } catch {
             return null;
           }
         }).filter(Boolean);

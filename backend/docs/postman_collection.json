@@ -117,21 +117,6 @@
       }
     },
     {
-      "name": "Payments - Create",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "url": "{{baseUrl}}/api/payments",
-        "body": {
-          "mode": "raw",
-          "raw": "{\"orderId\":1}"
-        }
-      }
-    },
-    {
       "name": "Admin - Login",
       "request": {
         "method": "POST",

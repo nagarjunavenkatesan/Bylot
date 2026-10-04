@@ -4,17 +4,30 @@ const env = require("../config/env");
 
 function signAccessToken(user) {
   return jwt.sign(
-    { sub: user.id, role: user.role, email: user.email },
+    {
+      sub: user.id,
+      role: user.role,
+      email: user.email,
+      token_version: user.token_version || 1,
+      tokenVersion: user.token_version || 1
+    },
     env.jwt.accessSecret,
-    { expiresIn: env.jwt.accessExpiresIn }
+    { expiresIn: env.jwt.accessExpiresIn || "15m" }
   );
 }
 
-function signRefreshToken(user) {
+function signRefreshToken(user, jti = null, familyId = null) {
+  const tokenJti = jti || randomToken();
+  const tokenFamilyId = familyId || randomToken();
   return jwt.sign(
-    { sub: user.id, tokenType: "refresh" },
+    {
+      sub: user.id,
+      tokenType: "refresh",
+      jti: tokenJti,
+      familyId: tokenFamilyId
+    },
     env.jwt.refreshSecret,
-    { expiresIn: env.jwt.refreshExpiresIn }
+    { expiresIn: env.jwt.refreshExpiresIn || "30d" }
   );
 }
 

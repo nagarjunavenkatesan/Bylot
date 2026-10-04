@@ -64,11 +64,3 @@ curl -X POST "$BASE_URL/api/orders" \
   -d '{"sellerId":1,"items":[{"productId":1,"quantity":2}]}'
 ```
 
-Create payment:
-
-```bash
-curl -X POST "$BASE_URL/api/payments" \
-  -H "Authorization: Bearer ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"orderId":1}'
-```

@@ -1,33 +1,67 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { setAccessToken, silentRefresh, apiRequest } from '../api/backendApi';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(() => {
-        const storedUser = localStorage.getItem('user');
-        if (!storedUser) return null;
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-        try {
-            return JSON.parse(storedUser);
-        } catch {
-            localStorage.removeItem('user');
-            return null;
+    useEffect(() => {
+        let isMounted = true;
+
+        async function initAuth() {
+            try {
+                const refreshedUser = await silentRefresh();
+                if (isMounted && refreshedUser) {
+                    setUser(refreshedUser);
+                }
+            } catch {
+                if (isMounted) {
+                    setUser(null);
+                }
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            }
         }
-    });
-    const loading = false;
 
-    const login = (userData) => {
-        const { accessToken, token, ...userOnly } = userData;
-        const actualToken = accessToken || token;
-        localStorage.setItem('user', JSON.stringify(userOnly));
-        if (actualToken) localStorage.setItem('accessToken', actualToken);
-        setUser(userOnly);
+        initAuth();
+
+        const handleAuthExpired = () => {
+            if (isMounted) {
+                setAccessToken(null);
+                setUser(null);
+            }
+        };
+
+        window.addEventListener('auth:expired', handleAuthExpired);
+
+        return () => {
+            isMounted = false;
+            window.removeEventListener('auth:expired', handleAuthExpired);
+        };
+    }, []);
+
+    const login = (authData) => {
+        const token = authData.accessToken || authData.token;
+        if (token) {
+            setAccessToken(token);
+        }
+        const userObj = authData.user || authData;
+        setUser(userObj);
     };
 
-    const logout = () => {
-        localStorage.removeItem('user');
-        localStorage.removeItem('accessToken');
-        setUser(null);
+    const logout = async () => {
+        try {
+            await apiRequest('/api/auth/logout', { method: 'POST' });
+        } catch {
+            // ignore network or logout errors
+        } finally {
+            setAccessToken(null);
+            setUser(null);
+        }
     };
 
     return (

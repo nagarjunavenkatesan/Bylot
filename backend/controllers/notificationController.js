@@ -1,22 +1,34 @@
 const { pool } = require("../config/db");
 const { success } = require("../utils/apiResponse");
+const AppError = require("../utils/AppError");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination, buildMeta } = require("../utils/pagination");
 
 const getNotifications = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 50);
+  const safeOffset = Math.max(0, Number(offset) || 0);
+
   const [[count], [rows]] = await Promise.all([
     pool.execute("SELECT COUNT(*) AS total FROM notifications WHERE user_id = ? OR user_id IS NULL", [req.user.id]),
     pool.execute(
       "SELECT * FROM notifications WHERE user_id = ? OR user_id IS NULL ORDER BY created_at DESC LIMIT ? OFFSET ?",
-      [req.user.id, limit, offset]
+      [req.user.id, safeLimit, safeOffset]
     )
   ]);
-  return success(res, "Notifications fetched successfully", rows, 200, buildMeta(count[0].total, page, limit));
+  return success(res, "Notifications fetched successfully", rows, 200, buildMeta(count[0].total, page, safeLimit));
 });
 
 const sendNotification = asyncHandler(async (req, res) => {
   const { userId = null, title, message, type = "system", channel = "in_app", data = null } = req.body;
+
+  if (userId) {
+    const [userRows] = await pool.execute("SELECT id FROM users WHERE id = ? LIMIT 1", [userId]);
+    if (!userRows[0]) {
+      throw new AppError("Target user not found", 404);
+    }
+  }
+
   const [result] = await pool.execute(
     "INSERT INTO notifications (user_id, title, message, type, channel, data) VALUES (?, ?, ?, ?, ?, ?)",
     [userId, title, message, type, channel, data ? JSON.stringify(data) : null]

@@ -5,11 +5,12 @@ const env = require("../config/env");
 const auditLogger = require("../security/auditLogger");
 const accountLockout = require("../security/accountLockout");
 const tokenBlacklist = require("../security/tokenBlacklist");
-const runSecurityAudit = require("../scripts/securityAudit");
-
 const { authenticate, authorize } = require("../middleware/authMiddleware");
 
-// GET /mcp/manifest - MCP Capability Description
+// CRITICAL SECURITY: Protect ALL /mcp routes (including manifest) with Admin authentication
+router.use(authenticate, authorize("admin"));
+
+// GET /mcp/manifest - MCP Capability Description (Admin Only)
 router.get("/manifest", (req, res) => {
   res.json({
     success: true,
@@ -21,9 +22,6 @@ router.get("/manifest", (req, res) => {
       tools: [
         "bylot_system_status",
         "bylot_security_audit",
-        "bylot_manage_users",
-        "bylot_manage_products",
-        "bylot_manage_orders",
         "bylot_security_action",
         "bylot_database_analytics"
       ],
@@ -36,9 +34,6 @@ router.get("/manifest", (req, res) => {
   });
 });
 
-// Protect all MCP tool execution routes with Admin authentication
-router.use("/tools", authenticate, authorize("admin"));
-
 // POST /mcp/tools/:toolName - Call MCP tool over HTTP (Admin Only)
 router.post("/tools/:toolName", async (req, res) => {
   const { toolName } = req.params;
@@ -50,8 +45,8 @@ router.post("/tools/:toolName", async (req, res) => {
         let dbStatus = "ONLINE";
         try {
           await pool.query("SELECT 1");
-        } catch (e) {
-          dbStatus = `OFFLINE (${e.message})`;
+        } catch {
+          dbStatus = "OFFLINE";
         }
         return res.json({
           success: true,
@@ -68,8 +63,9 @@ router.post("/tools/:toolName", async (req, res) => {
       }
 
       case "bylot_security_audit": {
+        const safeLimit = Math.min(Math.max(1, Number(args.limit) || 20), 100);
         const auditStats = auditLogger.getStats();
-        const logs = auditLogger.getRecentLogs(args.limit || 20, null, args.minSeverity || null);
+        const logs = auditLogger.getRecentLogs(safeLimit, null, args.minSeverity || null);
         const lockouts = accountLockout.getLockoutStats();
         const revoked = tokenBlacklist.getStats();
 
@@ -89,12 +85,13 @@ router.post("/tools/:toolName", async (req, res) => {
 
       case "bylot_security_action": {
         if (args.action === "clear_lockout") {
-          accountLockout.clearLockout(args.identifier || "", args.identifier || "");
-          return res.json({ success: true, message: `Lockout cleared for ${args.identifier}` });
-        }
-        if (args.action === "run_audit_scan") {
-          const scanResults = runSecurityAudit();
-          return res.json({ success: true, result: scanResults });
+          const email = args.email || args.identifier;
+          const ip = args.ip;
+          if (!email && !ip) {
+            return res.status(400).json({ success: false, message: "Email or IP required." });
+          }
+          accountLockout.clearLockout(email || "", ip || "");
+          return res.json({ success: true, message: `Lockout cleared for ${email || ip}` });
         }
         return res.status(400).json({ success: false, message: "Invalid action." });
       }
@@ -103,7 +100,6 @@ router.post("/tools/:toolName", async (req, res) => {
         const [[userCount]] = await pool.query("SELECT COUNT(*) as total FROM users");
         const [[productCount]] = await pool.query("SELECT COUNT(*) as total FROM products");
         const [[orderCount]] = await pool.query("SELECT COUNT(*) as total FROM orders");
-        const [[revenueSum]] = await pool.query("SELECT COALESCE(SUM(grand_total), 0) as total FROM orders WHERE payment_status = 'paid'");
 
         return res.json({
           success: true,
@@ -112,17 +108,17 @@ router.post("/tools/:toolName", async (req, res) => {
             totalUsers: userCount.total,
             totalProducts: productCount.total,
             totalOrders: orderCount.total,
-            totalRevenuePaid: revenueSum.total,
             timestamp: new Date().toISOString()
           }
         });
       }
 
       default:
-        return res.status(404).json({ success: false, message: `Tool '${toolName}' not found or requires stdio execution.` });
+        return res.status(404).json({ success: false, message: `Tool '${toolName}' not found.` });
     }
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error("[MCP Error]:", err.message);
+    res.status(500).json({ success: false, message: "MCP tool execution failed." });
   }
 });
 

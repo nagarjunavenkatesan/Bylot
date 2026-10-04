@@ -47,8 +47,6 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-358858464400-6di0qk18deq2fejn7g3f830i2g5fr1nf.apps.googleusercontent.com}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       APP_URL: ${APP_URL:-https://bylot.in}
-      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-manual}
-      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-}
     volumes:
       - uploads_data:/app/uploads
     networks:

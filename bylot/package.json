@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "start": "node app.js",
     "lint": "eslint .",
+    "test": "node --test src/utils/pricing.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

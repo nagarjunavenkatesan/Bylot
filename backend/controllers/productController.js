@@ -3,7 +3,19 @@ const { success } = require("../utils/apiResponse");
 const AppError = require("../utils/AppError");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination, buildMeta } = require("../utils/pagination");
-const { productSelect, baseProductQuery, findProductById } = require("../models/productModel");
+const {
+  productListSelect,
+  PUBLIC_PRODUCT_JOINS,
+  PUBLIC_PRODUCT_CONDITION,
+  baseProductQuery,
+  baseProductCountQuery,
+  findProductById
+} = require("../models/productModel");
+
+function escapeLike(str) {
+  if (typeof str !== "string") return "";
+  return str.replace(/([%_\\])/g, "\\$1");
+}
 
 function sortClause(sort) {
   const sorts = {
@@ -16,57 +28,148 @@ function sortClause(sort) {
   return sorts[sort] || sorts.newest;
 }
 
+// In-memory cache for hot product endpoints (30s TTL per Phase 4)
+const hotCache = new Map();
+const CACHE_TTL_MS = 30 * 1000;
+
+function getCached(key) {
+  const item = hotCache.get(key);
+  if (!item) return null;
+  if (Date.now() - item.time > CACHE_TTL_MS) {
+    hotCache.delete(key);
+    return null;
+  }
+  return item.data;
+}
+
+function setCached(key, data) {
+  if (hotCache.size >= 100) {
+    const firstKey = hotCache.keys().next().value;
+    hotCache.delete(firstKey);
+  }
+  hotCache.set(key, { time: Date.now(), data });
+}
+
+function clearHotCache() {
+  hotCache.clear();
+}
+
 async function listProducts(req, customWhere = [], customParams = []) {
-  const { page, limit, offset } = getPagination(req.query);
-  const where = ["p.status = 'active'", ...customWhere];
+  // Helper to safely get string or scalar query param (prevent array injection)
+  const getParam = (val) => (Array.isArray(val) ? val[0] : val);
+
+  const { page, limit } = getPagination(req.query);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 50);
+  // Cap max page to prevent deep offset table scan DoS (Phase 4)
+  const safePage = Math.min(Math.max(1, Number(page) || 1), 100);
+  const safeOffset = (safePage - 1) * safeLimit;
+
+  const where = ["1=1", ...customWhere];
   const params = [...customParams];
 
-  if (req.query.categoryId) { where.push("p.category_id = ?"); params.push(req.query.categoryId); }
-  if (req.query.sellerId)   { where.push("p.seller_id = ?");   params.push(req.query.sellerId); }
-  if (req.query.minPrice)   { where.push("p.selling_price >= ?"); params.push(req.query.minPrice); }
-  if (req.query.maxPrice)   { where.push("p.selling_price <= ?"); params.push(req.query.maxPrice); }
-  if (req.query.type)       { where.push("p.product_type = ?");   params.push(req.query.type); }
-  if (req.query.q) {
-    where.push("(p.name LIKE ? OR p.brand LIKE ? OR p.description LIKE ?)");
-    const q = `%${req.query.q}%`;
-    params.push(q, q, q);
+  // Keyset (cursor) pagination for O(1) unlimited deep paging
+  const cursor = getParam(req.query.cursor) || getParam(req.query.afterId);
+  if (cursor && Number.isInteger(Number(cursor)) && Number(cursor) > 0) {
+    where.push("p.id < ?");
+    params.push(Number(cursor));
   }
 
-  const whereSql = where.join(" AND ");
-  const safeLimit = Math.max(1, Number(limit) || 20);
-  const safeOffset = Math.max(0, Number(offset) || 0);
+  const categoryId = getParam(req.query.categoryId);
+  if (categoryId && Number.isInteger(Number(categoryId))) {
+    where.push("p.category_id = ?");
+    params.push(Number(categoryId));
+  }
 
-  const [countRows] = await pool.query(
-    `SELECT COUNT(*) AS total FROM products p JOIN sellers s ON s.id = p.seller_id WHERE ${whereSql}`,
-    params
-  );
-  let rows = [];
-  try {
-    const sql = `${baseProductQuery(whereSql)} ORDER BY ${sortClause(req.query.sort)} LIMIT ${safeLimit} OFFSET ${safeOffset}`;
-    const [resultRows] = await pool.query(sql, params);
-    rows = resultRows;
-  } catch (err) {
-    // If database schema is missing p.product_item_id, retry without product_item_id
-    if (err.code === 'ER_BAD_FIELD_ERROR' && err.message.includes('product_item_id')) {
-      const fallbackQuery = baseProductQuery(whereSql).replace('p.product_item_id,', '');
-      const sql = `${fallbackQuery} ORDER BY ${sortClause(req.query.sort)} LIMIT ${safeLimit} OFFSET ${safeOffset}`;
-      const [resultRows] = await pool.query(sql, params);
-      rows = resultRows;
+  const sellerId = getParam(req.query.sellerId);
+  if (sellerId && Number.isInteger(Number(sellerId))) {
+    where.push("p.seller_id = ?");
+    params.push(Number(sellerId));
+  }
+
+  const minPrice = getParam(req.query.minPrice);
+  if (minPrice !== undefined && !Number.isNaN(Number(minPrice)) && Number(minPrice) >= 0) {
+    where.push("p.selling_price >= ?");
+    params.push(Number(minPrice));
+  }
+
+  const maxPrice = getParam(req.query.maxPrice);
+  if (maxPrice !== undefined && !Number.isNaN(Number(maxPrice)) && Number(maxPrice) >= 0) {
+    where.push("p.selling_price <= ?");
+    params.push(Number(maxPrice));
+  }
+
+  const type = getParam(req.query.type);
+  if (type && typeof type === "string" && ["daily_essential", "near_expiry", "discount", "corporate_clearance"].includes(type)) {
+    where.push("p.product_type = ?");
+    params.push(type);
+  }
+
+  const rawQ = getParam(req.query.q);
+  if (rawQ && typeof rawQ === "string" && rawQ.trim()) {
+    const cleanQ = rawQ.trim();
+    const words = cleanQ.replace(/[^a-zA-Z0-9]/g, " ").trim().split(/\s+/).filter(w => w.length >= 3);
+    if (words.length > 0) {
+      where.push("MATCH(p.name, p.brand, p.description) AGAINST(? IN BOOLEAN MODE)");
+      const ftQuery = words.map(w => `+${w}*`).join(" ");
+      params.push(ftQuery);
     } else {
-      throw err;
+      const escaped = escapeLike(cleanQ);
+      where.push("(p.name LIKE ? OR p.brand LIKE ?)");
+      const prefixPattern = `${escaped}%`;
+      params.push(prefixPattern, prefixPattern);
     }
   }
-  return { rows, meta: buildMeta(countRows[0]?.total || 0, page, limit) };
+
+  const whereClause = where.join(" AND ");
+
+  // Count and row query use EXACTLY the same joins and condition
+  const countSql = baseProductCountQuery(whereClause);
+  const rowSql = `${baseProductQuery(whereClause)} ORDER BY ${sortClause(getParam(req.query.sort))} LIMIT ? OFFSET ?`;
+
+  let countRows, rows;
+  try {
+    [countRows] = await pool.query(countSql, params);
+    [rows] = await pool.query(rowSql, [...params, safeLimit, safeOffset]);
+  } catch (err) {
+    if (err.code === "ER_PARSE_ERROR" || (err.message && err.message.includes("syntax error"))) {
+      const fallbackWhere = ["1=1", ...customWhere, "(p.name LIKE ? OR p.brand LIKE ?)"];
+      const fallbackWhereClause = fallbackWhere.join(" AND ");
+      const escaped = `${escapeLike(rawQ ? String(rawQ).trim() : "")}%`;
+      const [fCount] = await pool.query(baseProductCountQuery(fallbackWhereClause), [...customParams, escaped, escaped]);
+      const [fRows] = await pool.query(`${baseProductQuery(fallbackWhereClause)} ORDER BY p.id DESC LIMIT ? OFFSET ?`, [...customParams, escaped, escaped, safeLimit, safeOffset]);
+      return { rows: fRows, meta: buildMeta(fCount[0]?.total || 0, safePage, safeLimit) };
+    }
+    throw err;
+  }
+
+  const total = countRows[0]?.total || 0;
+  return { rows, meta: buildMeta(total, safePage, safeLimit) };
 }
 
 const getAllProducts = asyncHandler(async (req, res) => {
-  const { rows, meta } = await listProducts(req);
-  return success(res, "Products fetched successfully", rows, 200, meta);
+  const cacheKey = `all_${JSON.stringify(req.query)}`;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    res.set("X-Cache", "HIT");
+    return success(res, "Products fetched successfully", cached.rows, 200, cached.meta);
+  }
+
+  const result = await listProducts(req);
+  setCached(cacheKey, result);
+  res.set("X-Cache", "MISS");
+  return success(res, "Products fetched successfully", result.rows, 200, result.meta);
 });
 
 const getProductById = asyncHandler(async (req, res) => {
-  const product = await findProductById(req.params.id);
-  if (!product) throw new AppError("Product not found", 404);
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new AppError("Invalid product ID", 400);
+  }
+
+  const product = await findProductById(id, false);
+  if (!product) {
+    throw new AppError("Product not found", 404);
+  }
   return success(res, "Product fetched successfully", product);
 });
 
@@ -81,62 +184,120 @@ const filterProducts = asyncHandler(async (req, res) => {
 });
 
 const discountProducts = asyncHandler(async (req, res) => {
-  const { rows, meta } = await listProducts(req, ["p.discount_percent > 0"]);
-  return success(res, "Discount products fetched successfully", rows, 200, meta);
+  const cacheKey = `discounts_${JSON.stringify(req.query)}`;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    res.set("X-Cache", "HIT");
+    return success(res, "Discount products fetched successfully", cached.rows, 200, cached.meta);
+  }
+
+  const result = await listProducts(req, ["p.discount_percent > 0"]);
+  setCached(cacheKey, result);
+  return success(res, "Discount products fetched successfully", result.rows, 200, result.meta);
 });
 
 const nearExpiryProducts = asyncHandler(async (req, res) => {
   const days = Math.min(Math.max(Number(req.query.days || 30), 1), 180);
-  const { rows, meta } = await listProducts(req, ["p.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)"], [days]);
-  return success(res, "Near expiry products fetched successfully", rows, 200, meta);
+  const cacheKey = `near_expiry_${days}_${JSON.stringify(req.query)}`;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    res.set("X-Cache", "HIT");
+    return success(res, "Near expiry products fetched successfully", cached.rows, 200, cached.meta);
+  }
+
+  const result = await listProducts(
+    req,
+    ["p.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)"],
+    [days]
+  );
+  setCached(cacheKey, result);
+  return success(res, "Near expiry products fetched successfully", result.rows, 200, result.meta);
 });
 
 const nearbyProducts = asyncHandler(async (req, res) => {
-  const { page, limit, offset } = getPagination(req.query);
   const lat = Number(req.query.latitude);
   const lng = Number(req.query.longitude);
-  const radiusKm = Math.min(Math.max(Number(req.query.radiusKm || 10), 1), 200);
 
-  // Fast bounding-box optimization: uses idx_sellers_location (latitude, longitude)
+  if (Number.isNaN(lat) || lat < -90 || lat > 90) {
+    throw new AppError("Invalid latitude (must be between -90 and 90)", 400);
+  }
+  if (Number.isNaN(lng) || lng < -180 || lng > 180) {
+    throw new AppError("Invalid longitude (must be between -180 and 180)", 400);
+  }
+
+  const radiusKm = Math.min(Math.max(Number(req.query.radiusKm || 10), 0.1), 200);
+  const { page, limit } = getPagination(req.query);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 50);
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeOffset = (safePage - 1) * safeLimit;
+
+  // Clamped bounding box
   const latDelta = radiusKm / 111.0;
+  const minLat = Math.max(-90, lat - latDelta);
+  const maxLat = Math.min(90, lat + latDelta);
+
   const cosLat = Math.cos((lat * Math.PI) / 180);
   const lonDelta = radiusKm / (111.0 * Math.max(Math.abs(cosLat), 0.01));
-  const minLat = lat - latDelta;
-  const maxLat = lat + latDelta;
-  const minLng = lng - lonDelta;
-  const maxLng = lng + lonDelta;
 
-  const distanceSql = "(6371 * ACOS(COS(RADIANS(?)) * COS(RADIANS(s.latitude)) * COS(RADIANS(s.longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(s.latitude))))";
-  const baseWhere = "p.status = 'active' AND s.latitude BETWEEN ? AND ? AND s.longitude BETWEEN ? AND ?";
-  const countParams = [minLat, maxLat, minLng, maxLng, lat, lng, lat, radiusKm];
-  const selectParams = [minLat, maxLat, minLng, maxLng, lat, lng, lat, radiusKm, limit, offset];
+  let lngCondition = "s.longitude BETWEEN ? AND ?";
+  let lngParams = [lng - lonDelta, lng + lonDelta];
 
-  const [countRows] = await pool.query(
-    `SELECT COUNT(*) AS total FROM (
-       SELECT p.id, ${distanceSql} AS distance_km
-       FROM products p JOIN sellers s ON s.id = p.seller_id
-       WHERE ${baseWhere}
-       HAVING distance_km <= ?
-     ) nearby`,
-    countParams
-  );
+  // Handle antimeridian wrap-around (-180 to 180)
+  if (lng - lonDelta < -180) {
+    lngCondition = "(s.longitude >= ? OR s.longitude <= ?)";
+    lngParams = [lng - lonDelta + 360, lng + lonDelta];
+  } else if (lng + lonDelta > 180) {
+    lngCondition = "(s.longitude >= ? OR s.longitude <= ?)";
+    lngParams = [lng - lonDelta, lng + lonDelta - 360];
+  }
 
-  const [rows] = await pool.query(
-    `SELECT ${productSelect}, ${distanceSql} AS distance_km
-     FROM products p
-     JOIN categories c ON c.id = p.category_id
-     JOIN sellers s ON s.id = p.seller_id
-     WHERE ${baseWhere}
-     HAVING distance_km <= ?
-     ORDER BY distance_km ASC
-     LIMIT ? OFFSET ?`,
-    selectParams
-  );
+  const distanceSql = `(6371 * ACOS(LEAST(1, GREATEST(-1,
+    COS(RADIANS(?)) * COS(RADIANS(s.latitude)) * COS(RADIANS(s.longitude) - RADIANS(?)) +
+    SIN(RADIANS(?)) * SIN(RADIANS(s.latitude))
+  ))))`;
 
-  return success(res, "Nearby products fetched successfully", rows, 200, buildMeta(countRows[0]?.total || rows.length, page, limit));
+  const whereClause = `
+    ${PUBLIC_PRODUCT_CONDITION}
+    AND s.latitude BETWEEN ? AND ?
+    AND ${lngCondition}
+  `;
+
+  const baseParams = [minLat, maxLat, ...lngParams];
+  const distanceParams = [lat, lng, lat];
+
+  // Count query
+  const countSql = `
+    SELECT COUNT(*) AS total
+    FROM (
+      SELECT p.id, ${distanceSql} AS distance_km
+      ${PUBLIC_PRODUCT_JOINS}
+      WHERE ${whereClause}
+      HAVING distance_km <= ?
+    ) nearby
+  `;
+  const [countRows] = await pool.query(countSql, [...distanceParams, ...baseParams, radiusKm]);
+  const total = countRows[0]?.total || 0;
+
+  // Data query
+  const rowSql = `
+    SELECT ${productListSelect}, ${distanceSql} AS distance_km
+    ${PUBLIC_PRODUCT_JOINS}
+    WHERE ${whereClause}
+    HAVING distance_km <= ?
+    ORDER BY distance_km ASC
+    LIMIT ? OFFSET ?
+  `;
+  const [rows] = await pool.query(rowSql, [
+    ...distanceParams,
+    ...baseParams,
+    radiusKm,
+    safeLimit,
+    safeOffset
+  ]);
+
+  return success(res, "Nearby products fetched successfully", rows, 200, buildMeta(total, safePage, safeLimit));
 });
 
-// POST /api/products/:id/report  (auth required — any logged-in user)
 const reportProduct = asyncHandler(async (req, res) => {
   const productId = req.params.id;
   const { reason, description } = req.body;
@@ -147,7 +308,6 @@ const reportProduct = asyncHandler(async (req, res) => {
   );
   if (!products[0]) throw new AppError("Product not found", 404);
 
-  // One report per user per product — re-submitting updates the reason
   await pool.execute(
     `INSERT INTO product_reports (product_id, reporter_id, reason, description)
      VALUES (?, ?, ?, ?)
@@ -170,5 +330,6 @@ module.exports = {
   discountProducts,
   nearExpiryProducts,
   nearbyProducts,
-  reportProduct
+  reportProduct,
+  clearHotCache
 };

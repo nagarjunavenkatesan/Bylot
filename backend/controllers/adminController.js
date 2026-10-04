@@ -25,28 +25,29 @@ const adminLogin = asyncHandler(async (req, res) => {
 
 const getAllUsers = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
-  const safeLimit = Math.max(1, Number(limit) || 20);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 100);
   const safeOffset = Math.max(0, Number(offset) || 0);
   const [[count], [users]] = await Promise.all([
     pool.query("SELECT COUNT(*) AS total FROM users"),
-    pool.query(`SELECT id, name, email, phone, role, status, created_at FROM users ORDER BY created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`)
+    pool.query("SELECT id, name, email, phone, role, status, created_at FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?", [safeLimit, safeOffset])
   ]);
-  return success(res, "Users fetched successfully", users, 200, buildMeta(count[0].total, page, limit));
+  return success(res, "Users fetched successfully", users, 200, buildMeta(count[0].total, page, safeLimit));
 });
 
 const getSellers = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
-  const safeLimit = Math.max(1, Number(limit) || 20);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 100);
   const safeOffset = Math.max(0, Number(offset) || 0);
   const [[count], [sellers]] = await Promise.all([
     pool.query("SELECT COUNT(*) AS total FROM sellers"),
     pool.query(
       `SELECT s.*, u.name, u.email, u.status AS user_status
        FROM sellers s JOIN users u ON u.id = s.user_id
-       ORDER BY s.created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`
+       ORDER BY s.created_at DESC LIMIT ? OFFSET ?`,
+      [safeLimit, safeOffset]
     )
   ]);
-  return success(res, "Sellers fetched successfully", sellers, 200, buildMeta(count[0].total, page, limit));
+  return success(res, "Sellers fetched successfully", sellers, 200, buildMeta(count[0].total, page, safeLimit));
 });
 
 const approveSeller = asyncHandler(async (req, res) => {
@@ -60,56 +61,84 @@ const approveSeller = asyncHandler(async (req, res) => {
 });
 
 const blockUser = asyncHandler(async (req, res) => {
-  const [result] = await pool.execute("UPDATE users SET status = ? WHERE id = ?", [req.body.status, req.params.id]);
-  if (!result.affectedRows) throw new AppError("User not found", 404);
+  const targetUserId = Number(req.params.id);
+  const currentAdminId = Number(req.user.id);
+
+  if (targetUserId === currentAdminId) {
+    throw new AppError("Administrators cannot alter their own account status or role", 400);
+  }
+
+  const [targetRows] = await pool.execute("SELECT id, role, status FROM users WHERE id = ? LIMIT 1", [targetUserId]);
+  const targetUser = targetRows[0];
+  if (!targetUser) {
+    throw new AppError("User not found", 404);
+  }
+
+  // Prevent blocking or demoting the last active administrator
+  if (targetUser.role === "admin" && targetUser.status === "active") {
+    if (req.body.status && req.body.status !== "active") {
+      const [adminRows] = await pool.query("SELECT COUNT(*) AS total FROM users WHERE role = 'admin' AND status = 'active'");
+      const activeAdminCount = Number(adminRows[0]?.total || 0);
+      if (activeAdminCount <= 1) {
+        throw new AppError("Cannot deactivate the last remaining active administrator", 400);
+      }
+    }
+  }
+
+  const newStatus = req.body.status || "blocked";
+  await pool.execute("UPDATE users SET status = ? WHERE id = ?", [newStatus, targetUserId]);
   return success(res, "User status updated successfully", null);
 });
 
 const dashboardAnalytics = asyncHandler(async (req, res) => {
-  const [[users], [sellers], [products], [orders], [revenue]] = await Promise.all([
+  const [[usersRows], [sellersRows], [productsRows], [ordersRows]] = await Promise.all([
     pool.execute("SELECT COUNT(*) AS total FROM users WHERE role = 'customer'"),
     pool.execute("SELECT COUNT(*) AS total FROM sellers"),
-    pool.execute("SELECT COUNT(*) AS total FROM products"),
-    pool.execute("SELECT COUNT(*) AS total FROM orders"),
-    pool.execute("SELECT COALESCE(SUM(grand_total), 0) AS total FROM orders WHERE payment_status = 'paid'")
+    pool.execute("SELECT COUNT(*) AS total FROM products WHERE status != 'deleted'"),
+    pool.execute("SELECT COUNT(*) AS total FROM orders")
   ]);
 
   return success(res, "Dashboard analytics fetched successfully", {
-    totalUsers: users[0]?.total || 0,
-    totalSellers: sellers[0]?.total || 0,
-    totalProducts: products[0]?.total || 0,
-    totalOrders: orders[0]?.total || 0,
-    revenue: revenue[0]?.total || 0
+    totalUsers: usersRows[0]?.total || 0,
+    totalSellers: sellersRows[0]?.total || 0,
+    totalProducts: productsRows[0]?.total || 0,
+    totalOrders: ordersRows[0]?.total || 0
   });
 });
 
 const manageProducts = asyncHandler(async (req, res) => {
   const { page, limit, offset } = getPagination(req.query);
-  const safeLimit = Math.max(1, Number(limit) || 20);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 100);
   const safeOffset = Math.max(0, Number(offset) || 0);
-  const q = req.query.q ? req.query.q.trim() : '';
-  let whereClause = '';
-  let params = [];
+  const q = req.query.q ? req.query.q.trim() : "";
+  let whereClause = "WHERE p.status != 'deleted'";
+  let countParams;
+  let selectParams;
 
   if (q) {
-    whereClause = 'WHERE (p.name LIKE ? OR p.product_item_id LIKE ?)';
-    const like = `%${q}%`;
-    params = [like, like];
+    const escaped = q.replace(/[%_\\]/g, "\\$&");
+    const like = `%${escaped}%`;
+    whereClause += " AND (p.name LIKE ? OR p.product_item_id LIKE ?)";
+    countParams = [like, like];
+    selectParams = [like, like, safeLimit, safeOffset];
+  } else {
+    countParams = [];
+    selectParams = [safeLimit, safeOffset];
   }
 
   const [[count], [products]] = await Promise.all([
-    pool.query(`SELECT COUNT(*) AS total FROM products p ${whereClause}`, params),
+    pool.query(`SELECT COUNT(*) AS total FROM products p ${whereClause}`, countParams),
     pool.query(
       `SELECT p.*, c.name AS category_name, s.business_name AS seller_name
        FROM products p
        JOIN categories c ON c.id = p.category_id
        JOIN sellers s ON s.id = p.seller_id
        ${whereClause}
-       ORDER BY p.created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`,
-      params
+       ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+      selectParams
     )
   ]);
-  return success(res, "Products fetched successfully", products, 200, buildMeta(count[0].total, page, limit));
+  return success(res, "Products fetched successfully", products, 200, buildMeta(count[0].total, page, safeLimit));
 });
 
 const updateProductStatus = asyncHandler(async (req, res) => {
@@ -119,7 +148,8 @@ const updateProductStatus = asyncHandler(async (req, res) => {
 });
 
 const deleteProduct = asyncHandler(async (req, res) => {
-  const [result] = await pool.execute("DELETE FROM products WHERE id = ?", [req.params.id]);
+  // Soft delete preserves order history and avoids foreign key constraint failure
+  const [result] = await pool.execute("UPDATE products SET status = 'deleted' WHERE id = ?", [req.params.id]);
   if (!result.affectedRows) throw new AppError("Product not found", 404);
   return success(res, "Product deleted successfully", null);
 });

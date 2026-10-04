@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import ProductCard from '../components/ProductCard';
 import PageTransition from '../components/PageTransition';
 import { useAuth } from '../context/AuthContext';
@@ -64,9 +63,7 @@ const Profile = () => {
     return (
         <PageTransition>
             <div className="container" style={{ padding: '2rem 1rem' }}>
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                <div
                     className="profile-header"
                     style={{
                         background: 'var(--card-bg)',
@@ -86,14 +83,25 @@ const Profile = () => {
                         <p style={{ color: 'var(--text-muted)' }}>{user.email}</p>
                         <p style={{ color: 'var(--text-muted)' }}>{user.phone}</p>
                     </div>
-                    <button 
-                        onClick={handleLogout} 
-                        className="btn btn-secondary"
-                        style={{ height: 'fit-content' }}
-                    >
-                        Logout
-                    </button>
-                </motion.div>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {user.role === 'admin' && (
+                            <button
+                                onClick={() => navigate('/admin')}
+                                className="btn btn-primary"
+                                style={{ height: 'fit-content' }}
+                            >
+                                🛡️ Admin Control Panel
+                            </button>
+                        )}
+                        <button 
+                            onClick={handleLogout} 
+                            className="btn btn-secondary"
+                            style={{ height: 'fit-content' }}
+                        >
+                            Logout
+                        </button>
+                    </div>
+                </div>
 
                 <h2 className="section-title">My Listings ({myItems.length})</h2>
                 

@@ -13,13 +13,17 @@ const Sell = lazy(() => import('./pages/Sell'))
 const ProductDetails = lazy(() => import('./pages/ProductDetails'))
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const SellerDetails = lazy(() => import('./pages/SellerDetails'))
 const Profile = lazy(() => import('./pages/Profile'))
 const EditItem = lazy(() => import('./pages/EditItem'))
 const AdminPanel = lazy(() => import('./pages/AdminPanel'))
+const SellerOrders = lazy(() => import('./pages/SellerOrders'))
 
 function AdminRoute({ children }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) return <Loader />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== 'admin') return <Navigate to="/" replace />;
   return children;
@@ -32,13 +36,6 @@ function App() {
     document.body.className = theme === 'dark' ? 'dark-mode' : '';
     localStorage.setItem('bylot-theme', theme);
   }, [theme]);
-
-  useEffect(() => {
-    // Generate handshake key immediately without blocking render
-    if (!localStorage.getItem('bylot-handshake')) {
-      localStorage.setItem('bylot-handshake', Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
-    }
-  }, []);
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -53,9 +50,12 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/browse" element={<Browse />} />
               <Route path="/sell" element={<Sell />} />
+              <Route path="/seller/orders" element={<SellerOrders />} />
               <Route path="/product/:id" element={<ProductDetails />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/seller/:id" element={<SellerDetails />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/edit-item/:id" element={<EditItem />} />

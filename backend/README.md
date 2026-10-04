@@ -134,11 +134,6 @@ Paginated responses include `meta`:
 - `GET /api/notifications`
 - `POST /api/notifications`
 
-### Payments
-
-- `POST /api/payments`
-- `POST /api/payments/verify`
-
 ### Admin
 
 - `POST /api/admin/login`

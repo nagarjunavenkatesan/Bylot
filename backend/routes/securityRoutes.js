@@ -4,21 +4,11 @@ const { authenticate, authorize } = require("../middleware/authMiddleware");
 const auditLogger = require("../security/auditLogger");
 const accountLockout = require("../security/accountLockout");
 const tokenBlacklist = require("../security/tokenBlacklist");
-const { generateCsrfToken } = require("../security/cryptoUtil");
 
-// Public CSRF handshake token generator
-router.get("/csrf-token", (req, res) => {
-  const csrfToken = generateCsrfToken();
-  res.json({
-    success: true,
-    data: { csrfToken }
-  });
-});
-
-// Admin-only Security Dashboard Endpoints
+// All Security Dashboard Endpoints require Admin Authentication
 router.use(authenticate, authorize("admin"));
 
-// GET /api/security/status - Get total security posture status
+// GET /api/security/status - Get security metrics
 router.get("/status", (req, res) => {
   const stats = auditLogger.getStats();
   const lockouts = accountLockout.getLockoutStats();
@@ -27,7 +17,7 @@ router.get("/status", (req, res) => {
   res.json({
     success: true,
     data: {
-      posture: "SECURE",
+      posture: stats.severityBreakdown.CRITICAL > 0 ? "ATTENTION_REQUIRED" : "NORMAL",
       threatLevel: stats.severityBreakdown.CRITICAL > 0 ? "ELEVATED" : "NORMAL",
       auditStats: stats,
       activeLockouts: lockouts,
@@ -39,7 +29,7 @@ router.get("/status", (req, res) => {
 
 // GET /api/security/events - Fetch recent security events
 router.get("/events", (req, res) => {
-  const limit = Math.min(Number(req.query.limit || 50), 200);
+  const limit = Math.min(Math.max(1, Number(req.query.limit || 50)), 200);
   const filterType = req.query.type || null;
   const minSeverity = req.query.severity || null;
 
@@ -53,22 +43,25 @@ router.get("/events", (req, res) => {
   });
 });
 
-// POST /api/security/clear-lockout - Manually unlock an identity
+// POST /api/security/clear-lockout - Manually unlock an identity (by email or IP)
 router.post("/clear-lockout", (req, res) => {
-  const { identifier, ip } = req.body;
-  if (!identifier && !ip) {
-    return res.status(400).json({ success: false, message: "Identifier or IP required." });
+  const { identifier, email, ip } = req.body;
+  const targetEmail = identifier || email;
+  const targetIp = ip;
+
+  if (!targetEmail && !targetIp) {
+    return res.status(400).json({ success: false, message: "Email or IP address is required." });
   }
 
-  accountLockout.clearLockout(identifier || "", ip || "");
+  accountLockout.clearLockout(targetEmail || "", targetIp || "");
   auditLogger.logEvent("ADMIN_ACTION", req, {
     severity: "INFO",
-    details: `Admin unlocked identity: ${identifier || ip}`
+    details: `Admin unlocked identity: email=${targetEmail || "none"}, ip=${targetIp || "none"}`
   });
 
   res.json({
     success: true,
-    message: `Lockout cleared for ${identifier || ip}.`
+    message: `Lockout cleared for ${targetEmail || targetIp}.`
   });
 });
 

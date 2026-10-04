@@ -1,13 +1,38 @@
+const readline = require("readline");
 const { pool } = require("../config/db");
 const { hashPassword } = require("../utils/password");
 
+function askQuestion(query) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  return new Promise((resolve) => rl.question(query, (ans) => {
+    rl.close();
+    resolve(ans);
+  }));
+}
+
 async function main() {
-  const email = process.env.ADMIN_EMAIL || "nagaarjunbv@gmail.com";
-  const password = process.env.ADMIN_PASSWORD || "@bvnd4014BV";
-  const name = process.env.ADMIN_NAME || "Bylot Admin";
+  let email = process.env.ADMIN_EMAIL;
+  let password = process.env.ADMIN_PASSWORD;
+  const name = process.env.ADMIN_NAME || "Bylot Administrator";
 
   if (!email) {
-    throw new Error("Set ADMIN_EMAIL before running npm run create-admin");
+    email = await askQuestion("Enter Admin Email: ");
+  }
+  if (!password) {
+    password = await askQuestion("Enter Admin Password: ");
+  }
+
+  email = (email || "").trim().toLowerCase();
+  password = (password || "").trim();
+
+  if (!email || !password) {
+    throw new Error("Both ADMIN_EMAIL and ADMIN_PASSWORD are required to create an admin user.");
+  }
+  if (password.length < 10) {
+    throw new Error("Admin password must be at least 10 characters long.");
   }
 
   const passwordHash = await hashPassword(password);

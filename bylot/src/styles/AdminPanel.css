@@ -287,8 +287,7 @@
 }
 
 .admin-status.active,
-.admin-status.approved,
-.admin-status.paid {
+.admin-status.approved {
     background: rgba(16, 185, 129, 0.14);
     color: #047857;
 }
@@ -517,9 +516,226 @@
     .admin-tabs {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
     }
 
     .admin-tab {
         justify-content: center;
+        font-size: 0.82rem;
+        padding: 0.6rem 0.5rem;
     }
+
+    /* Stat cards: 2 col on tablet, 1 col on tiny */
+    .admin-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Product ID search input */
+    .admin-id-search-input {
+        flex-wrap: wrap;
+    }
+
+    .admin-id-search-input input {
+        min-width: 0;
+        flex: 1 1 120px;
+    }
+
+    /* Action rows wrap tightly */
+    .admin-action-row {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+
+    .admin-id-result-actions {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 479px) {
+    .admin-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-tabs {
+        grid-template-columns: 1fr;
+    }
+
+    /* Reports summary: 2 per row */
+    .reports-summary {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.5rem !important;
+    }
+
+    .report-summary-card {
+        padding: 0.75rem !important;
+    }
+}
+
+/* ── Admin table must scroll on any narrow viewport ────── */
+.admin-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Fraud reports section */
+.admin-reports-section {
+    width: 100%;
+}
+
+.reports-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.report-summary-card {
+    flex: 1 1 120px;
+    min-width: 100px;
+    padding: 1rem;
+    border-radius: var(--radius-sm);
+    background: var(--rbg, rgba(99,102,241,0.1));
+    color: var(--rc, var(--primary));
+    border: 1.5px solid currentColor;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition: opacity var(--transition-fast);
+}
+
+.report-summary-card strong {
+    font-size: 1.5rem;
+}
+
+.report-summary-card.active-filter {
+    opacity: 0.85;
+    box-shadow: var(--shadow-md);
+}
+
+.report-cards {
+    display: grid;
+    gap: 1rem;
+}
+
+.report-card {
+    background: var(--bg-glass);
+    border: 1px solid rgba(150,150,150,0.18);
+    border-radius: var(--radius-sm);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.report-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.report-card-product {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.report-product-thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.report-product-name {
+    font-weight: 700;
+    word-break: break-word;
+}
+
+.report-seller-name {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.report-card-body {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.report-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.report-reason-tag {
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-full);
+    background: rgba(245,158,11,0.15);
+    color: #b45309;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.report-date {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.report-reporter {
+    font-size: 0.88rem;
+}
+
+.report-description,
+.report-admin-note {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    font-style: italic;
+    word-break: break-word;
+}
+
+.report-card-actions {
+    margin-top: 0.75rem;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.report-note-input {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-main);
+    font: inherit;
+    font-size: 0.88rem;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.report-action-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.admin-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    background: #ef4444;
+    color: #fff;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    margin-left: 2px;
 }

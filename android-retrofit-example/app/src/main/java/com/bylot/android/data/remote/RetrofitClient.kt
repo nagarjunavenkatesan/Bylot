@@ -14,13 +14,13 @@ import javax.net.ssl.X509TrustManager
 
 object RetrofitClient {
     // Production default: https://bylot.in/api/
-    // For local emulator development against your PC, use "http://10.0.2.2:5000/api/"
     const val BASE_URL = "https://bylot.in/api/"
-    private const val API_KEY = "07dad0dd8d8e9ce8ffb28f53bd4156b75b2a61e22ee67c8fa4c4bca0a93a14c0"
+    // Pass API key via environment / secure configuration rather than hardcoding
+    private val API_KEY: String get() = System.getProperty("BYLOT_API_KEY") ?: ""
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = HttpLoggingInterceptor.Level.BASIC
         }
     }
 

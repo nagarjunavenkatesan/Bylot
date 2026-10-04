@@ -19,12 +19,16 @@ async function verifyGoogleIdToken(idToken) {
     throw new AppError("Invalid Google token", 401);
   }
 
+  if (payload.email_verified !== true) {
+    throw new AppError("Google account email is not verified", 401);
+  }
+
   return {
     googleId: payload.sub,
     email: payload.email,
     name: payload.name || payload.email.split("@")[0],
     picture: payload.picture,
-    emailVerified: Boolean(payload.email_verified)
+    emailVerified: true
   };
 }
 

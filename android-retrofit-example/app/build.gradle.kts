@@ -4,6 +4,17 @@ plugins {
 }
 
 android {
+    buildFeatures {
+        buildConfig = true
+    }
+    defaultConfig {
+        buildConfigField("String", "API_BASE_URL", "\"https://bylot.in/api/\"")
+    }
+    buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5000/api/\"")
+        }
+    }
     namespace = "com.bylot.android"
     compileSdk = 35
 

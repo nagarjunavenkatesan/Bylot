@@ -11,9 +11,9 @@ const authLimiter = rateLimit({
   }
 });
 
-const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 200,
+const publicGetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1500, // Generous limit for public GET requests
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -22,7 +22,32 @@ const apiLimiter = rateLimit({
   }
 });
 
+const writeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 150, // Stricter limit for POST/PUT/PATCH/DELETE writes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many requests. Please slow down."
+  }
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Upload limit exceeded. Please wait before uploading more images."
+  }
+});
+
 module.exports = {
   authLimiter,
-  apiLimiter
+  publicGetLimiter,
+  writeLimiter,
+  uploadLimiter,
+  apiLimiter: writeLimiter
 };

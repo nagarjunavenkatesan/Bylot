@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS bylot CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE bylot;
+-- Schema for Bylot Marketplace Database
+-- Executes against the currently selected database connection
 
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -9,10 +9,12 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NULL,
   google_id VARCHAR(190) NULL UNIQUE,
   role ENUM('customer', 'seller', 'admin') NOT NULL DEFAULT 'customer',
+  token_version INT UNSIGNED NOT NULL DEFAULT 1,
   profile_image VARCHAR(255) NULL,
   status ENUM('active', 'blocked', 'deleted') NOT NULL DEFAULT 'active',
   email_verified_at TIMESTAMP NULL,
-  refresh_token_hash VARCHAR(255) NULL,
+  email_verification_token_hash VARCHAR(64) NULL,
+  email_verification_expires_at TIMESTAMP NULL,
   password_reset_token_hash VARCHAR(255) NULL,
   password_reset_expires_at TIMESTAMP NULL,
   last_login_at TIMESTAMP NULL,
@@ -20,6 +22,24 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_users_role (role),
   INDEX idx_users_status (status)
+);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT UNSIGNED NOT NULL,
+  jti VARCHAR(64) NOT NULL UNIQUE,
+  token_hash VARCHAR(64) NOT NULL,
+  family_id VARCHAR(64) NOT NULL,
+  user_agent VARCHAR(255) NULL,
+  ip_address VARCHAR(45) NULL,
+  expires_at TIMESTAMP NOT NULL,
+  revoked_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_refresh_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_refresh_user (user_id),
+  INDEX idx_refresh_jti (jti),
+  INDEX idx_refresh_family (family_id),
+  INDEX idx_refresh_hash (token_hash)
 );
 
 CREATE TABLE IF NOT EXISTS admin (
@@ -93,17 +113,23 @@ CREATE TABLE IF NOT EXISTS products (
   batch_number VARCHAR(80) NULL,
   product_type ENUM('daily_essential', 'near_expiry', 'discount', 'corporate_clearance') NOT NULL DEFAULT 'daily_essential',
   image_url VARCHAR(255) NULL,
-  status ENUM('draft', 'active', 'inactive', 'out_of_stock', 'blocked') NOT NULL DEFAULT 'active',
+  status ENUM('draft', 'active', 'inactive', 'out_of_stock', 'blocked', 'deleted') NOT NULL DEFAULT 'active',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_products_seller FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE,
   CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT,
+  CONSTRAINT chk_products_selling_price CHECK (selling_price >= 0),
+  CONSTRAINT chk_products_stock_quantity CHECK (stock_quantity >= 0),
+  CONSTRAINT chk_products_mrp CHECK (mrp >= 0),
   UNIQUE KEY uk_products_seller_slug (seller_id, slug),
-  INDEX idx_products_category_status (category_id, status),
-  INDEX idx_products_discount (discount_percent),
-  INDEX idx_products_expiry (expiry_date),
-  INDEX idx_products_search (name, brand),
-  INDEX idx_products_item_id (product_item_id)
+  INDEX idx_products_status_created (status, created_at),
+  INDEX idx_products_status_discount (status, discount_percent),
+  INDEX idx_products_status_price (status, selling_price),
+  INDEX idx_products_status_expiry (status, expiry_date),
+  INDEX idx_products_cat_status_created (category_id, status, created_at),
+  INDEX idx_products_seller_status (seller_id, status),
+  INDEX idx_products_item_id (product_item_id),
+  FULLTEXT INDEX idx_products_ft (name, brand, description)
 );
 
 CREATE TABLE IF NOT EXISTS offers (
@@ -152,7 +178,6 @@ CREATE TABLE IF NOT EXISTS orders (
   seller_id BIGINT UNSIGNED NOT NULL,
   location_id BIGINT UNSIGNED NULL,
   status ENUM('pending', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled') NOT NULL DEFAULT 'pending',
-  payment_status ENUM('pending', 'paid', 'failed', 'refunded') NOT NULL DEFAULT 'pending',
   subtotal DECIMAL(10, 2) NOT NULL,
   discount_total DECIMAL(10, 2) NOT NULL DEFAULT 0,
   delivery_fee DECIMAL(10, 2) NOT NULL DEFAULT 0,
@@ -182,25 +207,6 @@ CREATE TABLE IF NOT EXISTS order_items (
   CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
   INDEX idx_order_items_order (order_id)
-);
-
-CREATE TABLE IF NOT EXISTS payments (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  order_id BIGINT UNSIGNED NOT NULL,
-  user_id BIGINT UNSIGNED NOT NULL,
-  provider VARCHAR(60) NOT NULL DEFAULT 'manual',
-  provider_payment_id VARCHAR(190) NULL,
-  amount DECIMAL(10, 2) NOT NULL,
-  currency CHAR(3) NOT NULL DEFAULT 'INR',
-  status ENUM('created', 'authorized', 'captured', 'failed', 'refunded') NOT NULL DEFAULT 'created',
-  metadata JSON NULL,
-  verified_at TIMESTAMP NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-  CONSTRAINT fk_payments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
-  INDEX idx_payments_order (order_id),
-  INDEX idx_payments_provider_payment (provider, provider_payment_id)
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
@@ -243,3 +249,14 @@ CREATE TABLE IF NOT EXISTS product_reports (
   INDEX idx_reports_status (status),
   INDEX idx_reports_product (product_id)
 );
+
+CREATE TABLE IF NOT EXISTS token_blacklist (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  token_hash VARCHAR(64) NOT NULL UNIQUE,
+  token_jti VARCHAR(64) NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_tb_hash (token_hash),
+  INDEX idx_tb_jti (token_jti),
+  INDEX idx_tb_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

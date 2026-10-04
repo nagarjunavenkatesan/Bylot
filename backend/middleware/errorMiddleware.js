@@ -26,16 +26,44 @@ function notFound(req, res, next) {
   next(err);
 }
 
-function errorHandler(err, req, res, next) {
-  const statusCode = err.statusCode || 500;
+function errorHandler(err, req, res, _next) {
+  let statusCode = err.statusCode || err.status || 500;
+  let message = err.message;
+
+  // Handle CORS rejection
+  if (err.message && err.message.includes("Origin not allowed by CORS")) {
+    statusCode = 403;
+    message = err.message;
+  }
+
+  // Handle Multer errors (file size limit, unexpected file)
+  if (err.name === "MulterError") {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      statusCode = 413;
+      message = "File size exceeds the allowed limit";
+    } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+      statusCode = 400;
+      message = `Unexpected upload field: ${err.field || "file"}`;
+    } else {
+      statusCode = 400;
+      message = err.message;
+    }
+  }
+
+  // Handle malformed JSON body
+  if (err instanceof SyntaxError && "body" in err && statusCode === 400) {
+    statusCode = 400;
+    message = "Malformed JSON payload in request body";
+  }
+
   const friendly = getFriendlyMessage(err);
-  const message = friendly || (statusCode === 500 ? "Something went wrong. Please try again." : err.message);
+  const finalMessage = friendly || (statusCode === 500 ? "Something went wrong. Please try again." : message);
 
   if (env.nodeEnv !== "test") {
     console.error(`[ERROR] ${statusCode} -`, err.message || err);
   }
 
-  return error(res, message, statusCode, err.errors);
+  return error(res, finalMessage, statusCode, err.errors);
 }
 
 module.exports = {

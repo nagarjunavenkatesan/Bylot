@@ -50,7 +50,7 @@ The project consists of three parts:
 
 ### Database
 - **MySQL** with utf8mb4 charset
-- 11 tables: users, admin, sellers, categories, products, offers, locations, orders, order_items, payments, notifications
+- 10 tables: users, admin, sellers, categories, products, offers, locations, orders, order_items, notifications
 
 ---
 
@@ -65,9 +65,8 @@ The project consists of three parts:
 | products | seller_id, category_id, name, mrp, selling_price, discount_percent, stock_quantity, expiry_date, status | Product listings |
 | offers | product_id, discount_type, discount_value, starts_at, ends_at | Promotional offers |
 | locations | user_id, city, latitude, longitude, is_default | Delivery addresses |
-| orders | order_number, user_id, seller_id, status, payment_status, grand_total | Purchase orders |
+| orders | order_number, user_id, seller_id, status, grand_total | Purchase orders |
 | order_items | order_id, product_id, quantity, unit_price | Line items per order |
-| payments | order_id, provider, amount, status | Payment records |
 | notifications | user_id, title, message, type, channel | In-app notifications |
 
 Default categories seeded: Daily Essentials, Near Expiry, Discount Products, Corporate Clearance.
@@ -145,11 +144,10 @@ Default categories seeded: Daily Essentials, Near Expiry, Discount Products, Cor
 |--------|-------------|
 | /api/categories | List categories, get products by category |
 | /api/notifications | Get notifications, send (admin only) |
-| /api/payments | Create and verify payments |
 | /health | Server health check |
 | /api/config | Frontend config (Google client ID) |
 
-**Total API endpoints: 38**
+**Total API endpoints: 36**
 
 ---
 
@@ -331,7 +329,6 @@ npm run dev                   # Start on port 5173
 | Item | Status | Notes |
 |------|--------|-------|
 | OTP phone verification | Mock only | Real SMS gateway (Twilio/MSG91) not integrated |
-| Payment gateway | Manual mode only | Razorpay/Stripe integration ready in service layer |
 | Email password reset | Requires SMTP config | Works when SMTP credentials are set |
 | Push notifications | Schema ready | FCM/push service not implemented |
 | Google Sign-In | Requires Client ID | Set `VITE_GOOGLE_CLIENT_ID` in frontend .env |

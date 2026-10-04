@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Card from './Card';
 import { FaTrash, FaEdit, FaFlag } from 'react-icons/fa';
 import { apiRequest } from '../api/backendApi';
+import { getProductPricing } from '../utils/pricing';
 
 const REPORT_REASONS = [
     { value: 'fake_product',      label: 'Fake / counterfeit product' },
@@ -49,11 +50,7 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
         }
     };
 
-    const origPrice = Number(product.originalPrice);
-    const currPrice = Number(product.price);
-    const discountPercent = origPrice && currPrice && origPrice > currPrice
-        ? Math.round(((origPrice - currPrice) / origPrice) * 100)
-        : null;
+    const pricing = getProductPricing(product);
 
     const distNum = product.distance != null ? Number(product.distance) : null;
     const hasValidDistance = distNum != null && !isNaN(distNum);
@@ -92,9 +89,9 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
                     {hasValidDistance && (
                         <span className="distance-tag">{distNum.toFixed(1)} km away</span>
                     )}
-                    {discountPercent > 0 && (
-                        <span className="google-skill-chip yellow" style={{ position: 'absolute', bottom: '1rem', left: '1rem', backdropFilter: 'blur(8px)', fontWeight: '800' }}>
-                            🔥 {discountPercent}% OFF
+                    {pricing.hasSavings && (
+                        <span className="discount-ribbon" aria-hidden="true">
+                            {pricing.ribbonLabel}
                         </span>
                     )}
                 </div>
@@ -123,9 +120,17 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
                     <h3 className="card-title">{product.name}</h3>
                     <p className="card-subtitle">{product.location}</p>
                     <div className="price-row">
-                        <span className="current-price">₹{product.price}</span>
-                        {product.originalPrice && <span className="original-price">₹{product.originalPrice}</span>}
+                        <span className="current-price">{pricing.formattedSelling || `₹${product.price}`}</span>
+                        {pricing.hasSavings && (
+                            <span className="original-price">{pricing.formattedMrp}</span>
+                        )}
                     </div>
+                    {pricing.hasSavings && (
+                        <p className="savings-badge" aria-label={pricing.ariaLabel}>
+                            {pricing.savingsLabel}
+                        </p>
+                    )}
+                    {!pricing.hasSavings && <div className="savings-badge-placeholder" aria-hidden="true" />}
                 </Link>
 
                 {/* Owner / Admin actions */}

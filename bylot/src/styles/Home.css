@@ -259,6 +259,24 @@
     text-decoration: line-through;
 }
 
+/* Keep card heights equal even when some have a savings badge */
+.listing-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.listing-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Savings badge / placeholder always at same vertical position */
+.savings-badge,
+.savings-badge-placeholder {
+  margin-top: auto;
+}
+
 @media (max-width: 992px) {
     .hero-content {
         grid-template-columns: 1fr;
@@ -279,9 +297,8 @@
     .hero-buttons button, .hero-buttons .btn { width: 100%; justify-content: center; }
     .steps-grid { grid-template-columns: 1fr !important; }
 
-    /* Mobile Product Grid & Compact Cards */
+    /* Mobile Product Grid & Compact Cards — column count from mobile-layout.css */
     .listings-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
         gap: 0.75rem !important;
     }
 
@@ -366,7 +383,6 @@
     .hero-text h1 { font-size: 1.8rem !important; }
     
     .listings-grid {
-        grid-template-columns: repeat(2, 1fr) !important;
         gap: 0.5rem !important;
     }
 

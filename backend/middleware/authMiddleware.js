@@ -12,19 +12,24 @@ async function authenticate(req, res, next) {
       throw new AppError("Please sign in to continue.", 401);
     }
 
-    if (tokenBlacklist.isBlacklisted(token)) {
+    if (await tokenBlacklist.isBlacklistedAsync(token)) {
       throw new AppError("Session revoked. Please sign in again.", 401);
     }
 
     const payload = verifyAccessToken(token);
     const [rows] = await pool.execute(
-      "SELECT id, name, email, phone, role, profile_image, status FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, name, email, phone, role, profile_image, status, token_version FROM users WHERE id = ? LIMIT 1",
       [payload.sub]
     );
 
     const user = rows[0];
     if (!user || user.status !== "active") {
       throw new AppError("Your account is not active. Please contact support.", 401);
+    }
+
+    const tokenVersionInPayload = payload.token_version !== undefined ? payload.token_version : payload.tokenVersion;
+    if (tokenVersionInPayload !== undefined && user.token_version !== undefined && tokenVersionInPayload !== user.token_version) {
+      throw new AppError("Session revoked. Please sign in again.", 401);
     }
 
     req.user = user;

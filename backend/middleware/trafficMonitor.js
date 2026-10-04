@@ -42,8 +42,17 @@ function disableProtection() {
 }
 
 function trafficMonitor(req, res, next) {
-  requestLog.push(Date.now());
+  // Do not count uploads, health checks, or static frontend files
+  if (
+    req.path.startsWith("/uploads") ||
+    req.path.startsWith("/health") ||
+    req.path.startsWith("/assets") ||
+    /\.(png|jpe?g|webp|svg|ico|css|js|woff2?|map)$/i.test(req.path)
+  ) {
+    return next();
+  }
 
+  requestLog.push(Date.now());
   const rate = getRequestRate();
 
   if (rate >= CRITICAL_THRESHOLD) {
@@ -55,15 +64,7 @@ function trafficMonitor(req, res, next) {
   }
 
   req.traffic = { rate, isWarning, isCritical };
-
-  if (isCritical && !req.path.startsWith("/api/admin") && !req.path.startsWith("/health") && req.method === "GET") {
-    return res.status(503).json({
-      success: false,
-      message: "The site is experiencing high traffic. Please try again shortly.",
-      retryAfter: 30
-    });
-  }
-
+  // Global 503 is completely removed. Rate limiting is enforced per-IP via express-rate-limit.
   next();
 }
 
@@ -98,6 +99,7 @@ async function checkAndAlert() {
   if (!level) lastAlertedLevel = null;
 }
 
-setInterval(checkAndAlert, 30 * 1000);
+const alertTimer = setInterval(checkAndAlert, 30 * 1000);
+if (alertTimer.unref) alertTimer.unref();
 
 module.exports = { trafficMonitor, getRequestRate, isWarning, isCritical };

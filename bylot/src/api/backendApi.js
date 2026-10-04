@@ -166,26 +166,114 @@ export const SAMPLE_PRODUCTS = [
     }
 ];
 
+// ---------- in-memory token management & 401 refresh queue ----------
+let inMemoryAccessToken = null;
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+export function setAccessToken(token) {
+    inMemoryAccessToken = token || null;
+}
+
+export function getAccessToken() {
+    return inMemoryAccessToken;
+}
+
+function subscribeTokenRefresh(cb) {
+    refreshSubscribers.push(cb);
+}
+
+function onRefreshed(newToken) {
+    refreshSubscribers.forEach(cb => cb(newToken));
+    refreshSubscribers = [];
+}
+
+export async function silentRefresh() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'bylot',
+                'Accept': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            setAccessToken(null);
+            return null;
+        }
+        const result = await response.json();
+        const data = result?.data || result;
+        if (data?.accessToken) {
+            setAccessToken(data.accessToken);
+            return data.user || null;
+        }
+        return null;
+    } catch {
+        setAccessToken(null);
+        return null;
+    }
+}
+
 // ---------- core request helper ----------
-export async function apiRequest(path, options = {}) {
+export async function apiRequest(path, options = {}, isRetry = false) {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
     const requestUrl = `${API_BASE_URL}${normalizedPath}`;
 
     const headers = {
         Accept: 'application/json',
+        'X-Requested-With': 'bylot',
         ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...options.headers,
     };
 
-    const token = localStorage.getItem('accessToken');
-    if (token && !headers['Authorization']) {
-        headers['Authorization'] = `Bearer ${token}`;
+    if (inMemoryAccessToken && !headers['Authorization']) {
+        headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
     }
 
     const response = await fetch(requestUrl, {
         ...options,
+        credentials: 'include',
         headers,
     });
+
+    // Handle 401 session expiry with automatic refresh token rotation and request retry
+    const isAuthEndpoint = normalizedPath.includes('/auth/login') ||
+                           normalizedPath.includes('/auth/register') ||
+                           normalizedPath.includes('/auth/refresh-token');
+
+    if (response.status === 401 && !isRetry && !isAuthEndpoint) {
+        if (!isRefreshing) {
+            isRefreshing = true;
+            try {
+                const refreshedUser = await silentRefresh();
+                isRefreshing = false;
+                if (refreshedUser && inMemoryAccessToken) {
+                    onRefreshed(inMemoryAccessToken);
+                    return apiRequest(path, options, true);
+                } else {
+                    onRefreshed(null);
+                    window.dispatchEvent(new CustomEvent('auth:expired'));
+                }
+            } catch (err) {
+                isRefreshing = false;
+                onRefreshed(null);
+                window.dispatchEvent(new CustomEvent('auth:expired'));
+                throw err;
+            }
+        } else {
+            return new Promise((resolve, reject) => {
+                subscribeTokenRefresh((newToken) => {
+                    if (newToken) {
+                        resolve(apiRequest(path, options, true));
+                    } else {
+                        reject(new Error('Session expired. Please log in again.'));
+                    }
+                });
+            });
+        }
+    }
 
     if (!response.ok) {
         let message = `Request failed (${response.status})`;

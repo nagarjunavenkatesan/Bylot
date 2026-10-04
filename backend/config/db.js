@@ -4,6 +4,10 @@ const env = require("./env");
 const pool = mysql.createPool({
   ...env.db,
   waitForConnections: true,
+  queueLimit: 100,
+  connectTimeout: 10000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
   decimalNumbers: true,
   timezone: "Z"
 });

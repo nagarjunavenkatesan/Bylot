@@ -83,7 +83,7 @@ Bylot/
 - MySQL Server 8.0+ running locally
 - Git
 
-### 1. Database Setup
+### 1. Database Setup & Migrations
 Ensure MySQL is running, then create the database and initialize the schema:
 ```bash
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS bylot CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
@@ -92,9 +92,22 @@ npm install
 npm run schema
 ```
 
-Optional: Create an admin user:
+Apply all database migrations in order:
+```bash
+for migration in ../migrations/*.sql; do
+  mysql -u root -p bylot < "$migration"
+done
+```
+
+Create an admin user securely (takes credentials from prompt/environment, never hardcoded):
 ```bash
 npm run create-admin
+```
+
+Run test suite and security audit:
+```bash
+npm test
+npm run security-audit
 ```
 
 ### 2. Backend Setup

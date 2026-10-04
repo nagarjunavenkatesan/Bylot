@@ -4,6 +4,7 @@ import Button from '../components/Button';
 import PageTransition from '../components/PageTransition';
 import { fetchProductById, deleteProduct, adminDeleteProduct, apiRequest } from '../api/backendApi';
 import '../styles/ProductDetails.css';
+import { getProductPricing } from '../utils/pricing';
 
 const ProductDetails = () => {
     const { id } = useParams();
@@ -28,6 +29,7 @@ const ProductDetails = () => {
 
     if (!product) return <div style={{ padding: '4rem', textAlign: 'center' }}>Loading...</div>;
 
+    const pricing = getProductPricing(product);
     const isAdmin = currentUser?.role === 'admin';
     const isOwner = currentUser && product && currentUser.id == product.seller_id;
 
@@ -96,14 +98,16 @@ const ProductDetails = () => {
                             <span className="expiry-badge">Expires: {product.expiry}</span>
                         </div>
                         <div className="price-block">
-                            <span className="current-price-lg">₹{product.price}</span>
-                            {product.originalPrice && Number(product.originalPrice) > Number(product.price) && (
-                                <>
-                                    <span className="original-price-lg">₹{product.originalPrice}</span>
-                                    <span className="discount-tag">Save ₹{(Number(product.originalPrice) - Number(product.price)).toFixed(0)}</span>
-                                </>
+                            <span className="current-price-lg">{pricing.formattedSelling || `₹${product.price}`}</span>
+                            {pricing.hasSavings && (
+                                <span className="original-price-lg">{pricing.formattedMrp}</span>
                             )}
                         </div>
+                        {pricing.hasSavings && (
+                            <p className="savings-badge savings-badge-lg" aria-label={pricing.ariaLabel}>
+                                {pricing.savingsLabel}
+                            </p>
+                        )}
                         <div className="info-row">
                             <span className="label">Item ID:</span>
                             <span className="value" style={{ fontWeight: '800', color: 'var(--primary)' }}>{product.product_item_id || `#${product.id}`}</span>

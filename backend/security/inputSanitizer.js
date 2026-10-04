@@ -1,77 +1,48 @@
 const auditLogger = require("./auditLogger");
 
-// Pattern checks for input sanitization
-const PROTOTYPE_POLLUTION_KEYS = ["__proto__", "constructor", "prototype"];
-const DANGEROUS_PATTERNS = [
-  /<script[\s>]/i,
-  /javascript:\s*/i,
-  /onload\s*=/i,
-  /onerror\s*=/i,
-  /(\b(union\s+select|drop\s+table|exec\s+xp_cmdshell|sp_executesql)\b)/i
-];
+const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
-function sanitizeString(str) {
-  if (typeof str !== "string") return str;
-  
-  // Strip dangerous html tags or javascript scripts
-  let sanitized = str
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/javascript:/gi, "")
-    .replace(/onload=/gi, "")
-    .replace(/onerror=/gi, "");
-  
-  return sanitized;
-}
-
-function sanitizeObject(obj, req = null, depth = 0) {
-  if (depth > 10 || !obj || typeof obj !== "object") return obj;
+function checkObjectForPrototypePollution(obj, req = null, depth = 0) {
+  if (depth > 10 || !obj || typeof obj !== "object") return;
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => sanitizeObject(item, req, depth + 1));
+    for (const item of obj) {
+      if (item && typeof item === "object") {
+        checkObjectForPrototypePollution(item, req, depth + 1);
+      }
+    }
+    return;
   }
 
-  const cleaned = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (PROTOTYPE_POLLUTION_KEYS.includes(key)) {
+  for (const key of Object.keys(obj)) {
+    if (FORBIDDEN_KEYS.has(key)) {
       auditLogger.logEvent("SUSPICIOUS_PAYLOAD", req, {
         severity: "CRITICAL",
-        details: `Prototype pollution attempt blocked key: ${key}`
+        details: `Prototype pollution attempt blocked: key '${key}'`
       });
+      delete obj[key];
       continue;
     }
 
-    if (typeof value === "string") {
-      cleaned[key] = sanitizeString(value);
-    } else if (typeof value === "object" && value !== null) {
-      cleaned[key] = sanitizeObject(value, req, depth + 1);
-    } else {
-      cleaned[key] = value;
+    const val = obj[key];
+    if (val && typeof val === "object") {
+      checkObjectForPrototypePollution(val, req, depth + 1);
     }
   }
-
-  return cleaned;
 }
 
 function inputSanitizerMiddleware(req, res, next) {
   try {
     if (req.body && typeof req.body === "object") {
-      req.body = sanitizeObject(req.body, req);
-    }
-    if (req.query && typeof req.query === "object") {
-      req.query = sanitizeObject(req.query, req);
-    }
-    if (req.params && typeof req.params === "object") {
-      req.params = sanitizeObject(req.params, req);
+      checkObjectForPrototypePollution(req.body, req);
     }
     next();
-  } catch (err) {
-    console.error("[inputSanitizer] Sanitization error:", err);
+  } catch {
     next();
   }
 }
 
 module.exports = {
-  sanitizeString,
-  sanitizeObject,
+  checkObjectForPrototypePollution,
   inputSanitizerMiddleware
 };

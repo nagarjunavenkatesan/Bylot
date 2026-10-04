@@ -3,7 +3,7 @@ const { success } = require("../utils/apiResponse");
 const AppError = require("../utils/AppError");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination, buildMeta } = require("../utils/pagination");
-const { baseProductQuery } = require("../models/productModel");
+const { baseProductQuery, baseProductCountQuery } = require("../models/productModel");
 
 let cachedCategories = null;
 let cachedCategoriesTimestamp = 0;
@@ -25,16 +25,29 @@ const getCategories = asyncHandler(async (req, res) => {
 });
 
 const getCategoryProducts = asyncHandler(async (req, res) => {
-  const { page, limit, offset } = getPagination(req.query);
-  const [categories] = await pool.execute("SELECT id, name FROM categories WHERE id = ? AND is_active = TRUE", [req.params.id]);
+  const categoryId = Number(req.params.id);
+  if (!Number.isInteger(categoryId) || categoryId <= 0) {
+    throw new AppError("Invalid category ID", 400);
+  }
+
+  const { page, limit } = getPagination(req.query);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 50);
+  const safePage = Math.max(1, Number(page) || 1);
+  const safeOffset = (safePage - 1) * safeLimit;
+
+  const [categories] = await pool.execute("SELECT id, name FROM categories WHERE id = ? AND is_active = TRUE", [categoryId]);
   if (!categories[0]) throw new AppError("Category not found", 404);
 
-  const [[count], [products]] = await Promise.all([
-    pool.execute("SELECT COUNT(*) AS total FROM products WHERE category_id = ? AND status = 'active'", [req.params.id]),
-    pool.query(`${baseProductQuery("p.category_id = ? AND p.status = 'active'")} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`, [req.params.id, limit, offset])
+  const whereClause = "p.category_id = ?";
+  const [[countRows], [products]] = await Promise.all([
+    pool.query(baseProductCountQuery(whereClause), [categoryId]),
+    pool.query(
+      `${baseProductQuery(whereClause)} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`,
+      [categoryId, safeLimit, safeOffset]
+    )
   ]);
 
-  return success(res, "Category products fetched successfully", products, 200, buildMeta(count[0].total, page, limit));
+  return success(res, "Category products fetched successfully", products, 200, buildMeta(countRows[0]?.total || 0, safePage, safeLimit));
 });
 
 module.exports = {

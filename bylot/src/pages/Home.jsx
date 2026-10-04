@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ProductCard from '../components/ProductCard';
@@ -41,6 +41,15 @@ const Home = () => {
     const { coords, status: locationStatus, loading: locationLoading, requestLocation, setManualLocation } = useLocation();
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 200);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [maxDistance, setMaxDistance] = useState(15);
     const [sortBy, setSortBy] = useState('recommended');
@@ -99,7 +108,7 @@ const Home = () => {
         const list = Array.isArray(products) ? products : [];
         let result = list.filter(product => {
             if (!product) return false;
-            const query = searchQuery.trim().toLowerCase();
+            const query = debouncedSearchQuery.trim().toLowerCase();
             const matchesSearch = !query ||
                 (product.name && String(product.name).toLowerCase().includes(query)) ||
                 (product.category && String(product.category).toLowerCase().includes(query)) ||
@@ -150,7 +159,7 @@ const Home = () => {
             }
             return 0;
         });
-    }, [products, searchQuery, selectedCategory, maxDistance, coords, sortBy]);
+    }, [products, debouncedSearchQuery, selectedCategory, maxDistance, coords, sortBy]);
 
     const containerVariants = {
         hidden: { opacity: 0 },

@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 @import './styles/GoogleSkillAnimations.css';
+@import './styles/breakpoints.css';
+@import './styles/mobile-layout.css';
 
 :root {
   /* Ultra-Modern Color Palette */
@@ -108,6 +110,7 @@ body {
   overflow-x: hidden;
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Background blob decorations */

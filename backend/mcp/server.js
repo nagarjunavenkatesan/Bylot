@@ -160,7 +160,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "bylot_security_audit": {
         const minSeverity = args?.minSeverity || null;
-        const limit = args?.limit || 20;
+        const limit = Math.min(Math.max(1, Number(args?.limit) || 20), 100);
 
         const auditStats = auditLogger.getStats();
         const logs = auditLogger.getRecentLogs(limit, null, minSeverity);
@@ -192,13 +192,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { action, query, userId } = args;
 
         if (action === "list" || action === "search") {
+          const limit = Math.min(Math.max(1, Number(args?.limit) || 20), 100);
           let sql = "SELECT id, name, email, phone, role, status, created_at FROM users";
           const params = [];
           if (query) {
             sql += " WHERE email LIKE ? OR name LIKE ?";
             params.push(`%${query}%`, `%${query}%`);
           }
-          sql += " ORDER BY id DESC LIMIT 20";
+          sql += " ORDER BY id DESC LIMIT ?";
+          params.push(limit);
 
           try {
             const [rows] = await pool.execute(sql, params);
@@ -206,7 +208,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               content: [{ type: "text", text: JSON.stringify({ count: rows.length, users: rows }, null, 2) }]
             };
           } catch (err) {
-            return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+            console.error("[MCP Error] manage_users:", err);
+            return { content: [{ type: "text", text: JSON.stringify({ error: "An administrative error occurred while processing users." }) }] };
           }
         }
 
@@ -223,7 +226,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               content: [{ type: "text", text: JSON.stringify({ success: true, message: `User ID ${userId} is now ${newStatus}.` }) }]
             };
           } catch (err) {
-            return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+            console.error("[MCP Error] manage_users block/unblock:", err);
+            return { content: [{ type: "text", text: JSON.stringify({ error: "Failed to update user status." }) }] };
           }
         }
         break;
@@ -233,13 +237,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { action, query, productId, status } = args;
 
         if (action === "list" || action === "search") {
+          const limit = Math.min(Math.max(1, Number(args?.limit) || 20), 100);
           let sql = "SELECT id, name, mrp, selling_price, discount_percent, stock_quantity, status, expiry_date FROM products";
           const params = [];
           if (query) {
             sql += " WHERE name LIKE ?";
             params.push(`%${query}%`);
           }
-          sql += " ORDER BY id DESC LIMIT 20";
+          sql += " ORDER BY id DESC LIMIT ?";
+          params.push(limit);
 
           try {
             const [rows] = await pool.execute(sql, params);
@@ -247,7 +253,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               content: [{ type: "text", text: JSON.stringify({ count: rows.length, products: rows }, null, 2) }]
             };
           } catch (err) {
-            return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+            console.error("[MCP Error] manage_products:", err);
+            return { content: [{ type: "text", text: JSON.stringify({ error: "An administrative error occurred while processing products." }) }] };
           }
         }
 
@@ -259,17 +266,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               content: [{ type: "text", text: JSON.stringify({ success: true, message: `Product ID ${productId} set to ${status}.` }) }]
             };
           } catch (err) {
-            return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+            console.error("[MCP Error] update_status:", err);
+            return { content: [{ type: "text", text: JSON.stringify({ error: "Failed to update product status." }) }] };
           }
         }
         break;
       }
 
       case "bylot_manage_orders": {
-        const limit = args?.limit || 10;
+        const limit = Math.min(Math.max(1, Number(args?.limit) || 10), 100);
         const filterStatus = args?.status || null;
 
-        let sql = "SELECT id, order_number, user_id, grand_total, status, payment_status, created_at FROM orders";
+        let sql = "SELECT id, order_number, user_id, grand_total, status, created_at FROM orders";
         const params = [];
         if (filterStatus) {
           sql += " WHERE status = ?";
@@ -284,7 +292,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [{ type: "text", text: JSON.stringify({ count: rows.length, orders: rows }, null, 2) }]
           };
         } catch (err) {
-          return { content: [{ type: "text", text: JSON.stringify({ error: err.message }) }] };
+          console.error("[MCP Error] manage_orders:", err);
+          return { content: [{ type: "text", text: JSON.stringify({ error: "An administrative error occurred while processing orders." }) }] };
         }
       }
 
@@ -312,7 +321,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const [[userCount]] = await pool.query("SELECT COUNT(*) as total FROM users");
           const [[productCount]] = await pool.query("SELECT COUNT(*) as total FROM products");
           const [[orderCount]] = await pool.query("SELECT COUNT(*) as total FROM orders");
-          const [[revenueSum]] = await pool.query("SELECT COALESCE(SUM(grand_total), 0) as total FROM orders WHERE payment_status = 'paid'");
 
           return {
             content: [
@@ -323,7 +331,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     totalUsers: userCount.total,
                     totalProducts: productCount.total,
                     totalOrders: orderCount.total,
-                    totalRevenuePaid: revenueSum.total,
                     timestamp: new Date().toISOString()
                   },
                   null,
@@ -333,8 +340,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             ]
           };
         } catch (err) {
+          console.error("[MCP Error] database_analytics:", err);
           return {
-            content: [{ type: "text", text: JSON.stringify({ error: err.message }) }]
+            content: [{ type: "text", text: JSON.stringify({ error: "Failed to fetch database analytics." }) }]
           };
         }
       }
@@ -343,8 +351,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         throw new Error(`Unknown tool: ${name}`);
     }
   } catch (error) {
+    console.error(`[MCP Tool Fatal Error] ${name}:`, error);
     return {
-      content: [{ type: "text", text: `Error executing ${name}: ${error.message}` }],
+      content: [{ type: "text", text: `Error executing ${name}: An internal administrative error occurred.` }],
       isError: true
     };
   }

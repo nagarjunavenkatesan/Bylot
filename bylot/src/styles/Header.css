@@ -132,12 +132,27 @@ body.dark-mode .header {
     .nav { gap: var(--spacing-md); }
 }
 
+.nav-overlay {
+    display: none;
+}
+
 @media (max-width: 768px) {
     .mobile-menu-btn { display: block; }
+
+    .nav-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 98;
+        border: none;
+        background: rgba(15, 23, 42, 0.45);
+        cursor: pointer;
+    }
 
     .nav {
         position: fixed;
         top: 0; left: 0; width: 100vw; height: 100vh;
+        height: 100dvh;
         background: var(--bg-glass);
         backdrop-filter: var(--blur-lg);
         -webkit-backdrop-filter: var(--blur-lg);
