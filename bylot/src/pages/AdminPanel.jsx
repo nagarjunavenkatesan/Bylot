@@ -1,11 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FaBoxOpen, FaChartLine, FaCheckCircle, FaEye, FaEyeSlash, FaFlag, FaLock, FaMapMarkedAlt, FaSearch, FaStore, FaTrash, FaUsers, FaUserShield } from 'react-icons/fa';
 import PageTransition from '../components/PageTransition';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import DistrictAnalytics from '../components/DistrictAnalytics';
 import SecurityMcpDashboard from '../components/SecurityMcpDashboard';
-import { API_BASE_URL } from '../api/backendApi';
+import { API_BASE_URL, getAccessToken, setAccessToken } from '../api/backendApi';
 import { useAuth } from '../context/AuthContext';
 import '../styles/AdminPanel.css';
+
+const adminSEO = pageSEO({
+    title: 'Admin Control Center',
+    path: '/admin',
+    noindex: true,
+});
+
 
 const tabs = [
     { id: 'overview',  label: 'Overview',  icon: FaChartLine },
@@ -23,9 +32,10 @@ const userStatuses    = ['active', 'blocked'];
 function unwrapList(r) { return Array.isArray(r?.data) ? r.data : []; }
 
 async function adminRequest(path, options = {}) {
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken() || localStorage.getItem('accessToken');
     const response = await fetch(`${API_BASE_URL}${path}`, {
         ...options,
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
             'X-Bylot-Handshake': localStorage.getItem('bylot-handshake') || '',
@@ -123,7 +133,12 @@ const AdminPanel = () => {
         setLoading(true); setError(''); setMessage('');
         try {
             const payload = await adminRequest('/api/admin/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-            login({ ...payload.data.user, accessToken: payload.data.accessToken });
+            const token = payload?.data?.accessToken || payload?.accessToken;
+            if (token) {
+                setAccessToken(token);
+                localStorage.setItem('accessToken', token);
+            }
+            login({ ...(payload?.data?.user || payload?.user || {}), accessToken: token });
             setPassword('');
             setMessage('Admin login successful.');
         } catch (err) { setError(err.message); }
@@ -185,6 +200,7 @@ const AdminPanel = () => {
     if (!isAdmin) {
         return (
             <PageTransition>
+                <SEOHead {...adminSEO} />
                 <section className="admin-login-page">
                     <div className="admin-login-panel">
                         <div className="admin-login-mark"><FaUserShield /></div>
@@ -215,6 +231,7 @@ const AdminPanel = () => {
 
     return (
         <PageTransition>
+            <SEOHead {...adminSEO} />
             <section className="admin-page">
                 <div className="container">
                     <div className="admin-hero">

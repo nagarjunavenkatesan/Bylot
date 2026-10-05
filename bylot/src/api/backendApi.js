@@ -280,6 +280,10 @@ export async function apiRequest(path, options = {}, isRetry = false) {
         try {
             const errorBody = await response.json();
             message = errorBody.message || message;
+            if (Array.isArray(errorBody.details) && errorBody.details.length > 0) {
+                const detailMsgs = errorBody.details.map(d => (d.field ? `${d.field}: ${d.message}` : d.message)).join(' | ');
+                message = `${message} — ${detailMsgs}`;
+            }
         } catch { /* keep http status message */ }
         throw new Error(message);
     }

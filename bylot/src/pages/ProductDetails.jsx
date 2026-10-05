@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import PageTransition from '../components/PageTransition';
 import { fetchProductById, deleteProduct, adminDeleteProduct, apiRequest } from '../api/backendApi';
+import SEOHead from '../components/SEOHead';
+import { productSEO, pageSEO } from '../utils/seo';
 import '../styles/ProductDetails.css';
 import { getProductPricing } from '../utils/pricing';
 
@@ -27,7 +29,16 @@ const ProductDetails = () => {
             .catch(err => console.error('Error fetching product:', err));
     }, [id]);
 
-    if (!product) return <div style={{ padding: '4rem', textAlign: 'center' }}>Loading...</div>;
+    const seoProps = product ? productSEO(product) : pageSEO({ title: 'Product Details', path: `/product/${id}` });
+
+    if (!product) {
+        return (
+            <PageTransition>
+                <SEOHead {...seoProps} />
+                <div style={{ padding: '4rem', textAlign: 'center' }}>Loading...</div>
+            </PageTransition>
+        );
+    }
 
     const pricing = getProductPricing(product);
     const isAdmin = currentUser?.role === 'admin';
@@ -82,6 +93,7 @@ const ProductDetails = () => {
 
     return (
         <PageTransition>
+            <SEOHead {...seoProps} />
             <div className="product-details-page container">
                 <div className="details-grid">
                     <div className="product-image-section">

@@ -25,7 +25,8 @@ const nearby = [
 ];
 
 const createProduct = [
-  body("categoryId").isInt({ min: 1 }),
+  body("categoryId").optional({ nullable: true }).isInt({ min: 1 }),
+  body("category").optional({ nullable: true }).isString().trim(),
   body("name").trim().isLength({ min: 2, max: 180 }),
   body("description").optional({ nullable: true }).trim().isLength({ max: 2000 }),
   body("sku").optional({ nullable: true }).trim().isLength({ max: 80 }),
@@ -38,10 +39,15 @@ const createProduct = [
     }
     return true;
   }),
-  body("stockQuantity").isInt({ min: 0 }),
+  body("stockQuantity").optional().isInt({ min: 0 }),
   body("lowStockThreshold").optional().isInt({ min: 0 }),
-  body("expiryDate").optional({ nullable: true }).isISO8601(),
-  body("manufactureDate").optional({ nullable: true }).isISO8601(),
+  body("expiryDate").optional({ nullable: true }).custom((value) => {
+    if (!value) return true;
+    const date = new Date(value);
+    if (isNaN(date.getTime())) throw new Error("Invalid date format");
+    return true;
+  }),
+  body("manufactureDate").optional({ nullable: true }),
   body("batchNumber").optional({ nullable: true }).trim().isLength({ max: 80 }),
   body("productType").optional().isIn(["daily_essential", "near_expiry", "discount", "corporate_clearance"]),
   body("imageUrl").optional({ nullable: true }).isString().isLength({ max: 500 }),

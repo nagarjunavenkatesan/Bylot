@@ -2,9 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaCamera, FaFolderOpen, FaTimes, FaMapMarkerAlt, FaStore } from 'react-icons/fa';
 import PageTransition from '../components/PageTransition';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import { apiRequest } from '../api/backendApi';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Sell.css';
+
+const sellSEO = pageSEO({
+    title: 'Sell Near-Expiry & Surplus Products',
+    description: 'List your near-expiry food and surplus items on Bylot to reduce food waste, recover costs, and reach local buyers.',
+    path: '/sell',
+    keywords: 'sell surplus groceries, sell near expiry items, local business surplus marketplace',
+});
+
 
 const DISTRICTS = [
     'Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli',
@@ -108,6 +118,7 @@ export default function Sell() {
             data.append('mrp', original);
             data.append('expiryDate', form.expiryDate);
             data.append('category', form.category);
+            data.append('categoryId', form.category === 'Dairy' ? 4 : form.category === 'Vegetables' ? 5 : form.category === 'Fruits' ? 6 : form.category === 'Bakery' ? 7 : 1);
             data.append('district', form.district);
             data.append('stockQuantity', form.stockQuantity || '1');
             data.append('location', form.location.trim());
@@ -133,6 +144,7 @@ export default function Sell() {
 
     return (
         <PageTransition>
+            <SEOHead {...sellSEO} />
             {/* ── Phone modal ── */}
             {showPhoneModal && (
                 <div className="sell-modal-backdrop">

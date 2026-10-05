@@ -1,8 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import PageTransition from '../components/PageTransition';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../api/backendApi';
+
+const sellerOrdersSEO = pageSEO({
+  title: 'Seller Orders Dashboard',
+  path: '/seller/orders',
+  noindex: true,
+});
+
 import { moneyFormatter } from '../utils/pricing';
 import '../styles/SellerOrders.css';
 
@@ -114,6 +123,7 @@ const SellerOrders = () => {
   if (!sellerApproved && user.role !== 'admin') {
     return (
       <PageTransition>
+        <SEOHead {...sellerOrdersSEO} />
         <div className="container seller-orders-page">
           <h1>Seller orders</h1>
           <p className="seller-orders-muted">
@@ -127,6 +137,7 @@ const SellerOrders = () => {
 
   return (
     <PageTransition>
+      <SEOHead {...sellerOrdersSEO} />
       <div className="container seller-orders-page">
         <header className="seller-orders-header">
           <h1>Seller orders</h1>

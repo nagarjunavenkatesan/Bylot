@@ -2,8 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import PageTransition from '../components/PageTransition';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import { useAuth } from '../context/AuthContext';
 import { deleteProduct, fetchProducts, apiRequest } from '../api/backendApi';
+
+const profileSEO = pageSEO({
+    title: 'My Profile & Account',
+    description: 'Manage your Bylot user profile and account details.',
+    path: '/profile',
+    noindex: true,
+});
+
 
 const Profile = () => {
     const navigate = useNavigate();
@@ -62,6 +72,7 @@ const Profile = () => {
 
     return (
         <PageTransition>
+            <SEOHead {...profileSEO} />
             <div className="container" style={{ padding: '2rem 1rem' }}>
                 <div
                     className="profile-header"

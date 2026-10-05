@@ -3,7 +3,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { GoogleLogin } from '@react-oauth/google';
 import PageTransition from '../components/PageTransition';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import { useAuth } from '../context/AuthContext';
+
+const registerSEO = pageSEO({
+    title: 'Create an Account',
+    description: 'Register for a Bylot account to start buying or selling discounted groceries and near-expiry goods.',
+    path: '/register',
+    noindex: true,
+});
+
 import { apiRequest } from '../api/backendApi';
 import { useGoogleAuth } from '../components/GoogleProvider';
 
@@ -113,6 +123,7 @@ const Register = () => {
 
     return (
         <PageTransition>
+            <SEOHead {...registerSEO} />
             <div className="container" style={{ minHeight: '85vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
                 <div className="card" style={{ maxWidth: '440px', width: '100%', padding: '2.5rem' }}>
                     <h2 className="section-title" style={{ fontSize: '2rem', marginBottom: '0.5rem', textAlign: 'center' }}>Create Account</h2>

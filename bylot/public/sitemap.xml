@@ -1,23 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <!-- Home -->
   <url>
     <loc>https://bylot.in/</loc>
+    <lastmod>2026-10-04</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
+
+  <!-- Browse / Listings -->
   <url>
     <loc>https://bylot.in/browse</loc>
+    <lastmod>2026-10-04</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>
   </url>
+
+  <!-- Category sub-paths (boosted for long-tail keywords) -->
   <url>
-    <loc>https://bylot.in/login</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <loc>https://bylot.in/browse?category=Vegetables</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://bylot.in/register</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <loc>https://bylot.in/browse?category=Fruits</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://bylot.in/browse?category=Dairy</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bylot.in/browse?category=Bakery</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://bylot.in/browse?category=Daily+Essentials</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Sell -->
+  <url>
+    <loc>https://bylot.in/sell</loc>
+    <lastmod>2026-10-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
 </urlset>

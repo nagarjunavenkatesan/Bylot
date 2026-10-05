@@ -1,5 +1,25 @@
 User-agent: *
 Allow: /
+Allow: /browse
+Allow: /product/
+Allow: /seller/
+
+# No value in indexing auth/dashboard flows
+Disallow: /login
+Disallow: /register
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /profile
+Disallow: /edit-item/
 Disallow: /admin
+Disallow: /seller/orders
 Disallow: /api/
+Disallow: /uploads/
+Disallow: /_vite/
+Disallow: /*.map$
+
+# Crawl-delay to be kind to shared hosting
+Crawl-delay: 2
+
+# Sitemap location
 Sitemap: https://bylot.in/sitemap.xml

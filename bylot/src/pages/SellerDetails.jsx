@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Button from '../components/Button';
 import PageTransition from '../components/PageTransition';
+import SEOHead from '../components/SEOHead';
+import { sellerSEO, pageSEO } from '../utils/seo';
 import { apiRequest } from '../api/backendApi';
 import '../styles/SellerDetails.css';
 
@@ -35,16 +37,34 @@ const SellerDetails = () => {
             .finally(() => setLoading(false));
     }, [id]);
 
-    if (loading) return <div className="container" style={{ padding: '4rem', textAlign: 'center' }}><div className="loader"></div></div>;
-    if (error || !seller) return (
-        <div className="container" style={{ padding: '4rem', textAlign: 'center' }}>
-            <h2>Seller not found</h2>
-            <Button onClick={() => navigate(-1)}>Go Back</Button>
-        </div>
-    );
+    const seoProps = seller
+        ? sellerSEO({ ...seller, id, store_name: seller.displayName })
+        : pageSEO({ title: 'Seller Profile', path: `/seller/${id}` });
+
+    if (loading) {
+        return (
+            <PageTransition>
+                <SEOHead {...seoProps} />
+                <div className="container" style={{ padding: '4rem', textAlign: 'center' }}><div className="loader"></div></div>
+            </PageTransition>
+        );
+    }
+
+    if (error || !seller) {
+        return (
+            <PageTransition>
+                <SEOHead {...seoProps} />
+                <div className="container" style={{ padding: '4rem', textAlign: 'center' }}>
+                    <h2>Seller not found</h2>
+                    <Button onClick={() => navigate(-1)}>Go Back</Button>
+                </div>
+            </PageTransition>
+        );
+    }
 
     return (
         <PageTransition>
+            <SEOHead {...seoProps} />
             <div className="seller-details-page container">
                 <Button variant="secondary" onClick={() => navigate(-1)} className="back-btn">&larr; Back</Button>
                 <motion.div className="seller-card" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>

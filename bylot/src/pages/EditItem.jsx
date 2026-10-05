@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageTransition from '../components/PageTransition';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import Loader from '../components/Loader';
 import { apiRequest } from '../api/backendApi';
+
 
 const EditItem = () => {
     const { id } = useParams();
@@ -75,8 +78,15 @@ const EditItem = () => {
 
     if (loading) return <Loader />;
 
+    const editSEO = pageSEO({
+        title: 'Edit Listing',
+        path: `/edit-item/${id}`,
+        noindex: true,
+    });
+
     return (
         <PageTransition>
+            <SEOHead {...editSEO} />
             <div className="container" style={{ padding: '2rem 1rem', maxWidth: '600px', margin: '0 auto' }}>
                 <h2 className="section-title">Edit Listing</h2>
                 <form onSubmit={handleSubmit}

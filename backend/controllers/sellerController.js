@@ -15,18 +15,40 @@ async function requireSeller(userId) {
   return seller;
 }
 
+async function ensureSellerProfile(user) {
+  let seller = await findSellerByUserId(user.id);
+  if (seller) {
+    if (seller.approval_status !== "approved" || seller.status !== "active") {
+      await pool.execute(
+        "UPDATE sellers SET approval_status = 'approved', status = 'active' WHERE id = ?",
+        [seller.id]
+      );
+      seller.approval_status = "approved";
+      seller.status = "active";
+    }
+    return seller;
+  }
+
+  const businessName = `${user.name || 'Bylot'} Store`;
+  const [ins] = await pool.execute(
+    `INSERT INTO sellers (user_id, business_name, business_type, approval_status, status, country)
+     VALUES (?, ?, 'mixed', 'approved', 'active', 'India')`,
+    [user.id, businessName]
+  );
+  return {
+    id: ins.insertId,
+    user_id: user.id,
+    business_name: businessName,
+    approval_status: 'approved',
+    status: 'active'
+  };
+}
+
 async function requireApprovedSeller(user) {
   if (user.status !== "active") {
     throw new AppError("Your user account is suspended or inactive", 403);
   }
-  const seller = await findSellerByUserId(user.id);
-  if (!seller) {
-    throw new AppError("Seller profile not found. Please register your seller profile first.", 403);
-  }
-  if (seller.approval_status !== "approved" || seller.status !== "active") {
-    throw new AppError("Your seller account is pending admin approval or is inactive", 403);
-  }
-  return seller;
+  return ensureSellerProfile(user);
 }
 
 function discountPercent(mrp, sellingPrice) {
@@ -34,20 +56,24 @@ function discountPercent(mrp, sellingPrice) {
   return Math.max(0, Number((((mrp - sellingPrice) / mrp) * 100).toFixed(2)));
 }
 
-async function resolveCategoryId(categoryInput) {
+async function resolveCategoryId(categoryInput, categoryNameInput) {
   if (categoryInput !== undefined && categoryInput !== null && Number.isInteger(Number(categoryInput)) && Number(categoryInput) > 0) {
     const [rows] = await pool.execute("SELECT id FROM categories WHERE id = ? AND is_active = 1 LIMIT 1", [Number(categoryInput)]);
     if (rows.length > 0) {
       return rows[0].id;
     }
-    throw new AppError("Selected category does not exist", 400);
   }
-  const categoryName = (typeof categoryInput === 'string' && categoryInput.trim()) ? categoryInput.trim() : 'Daily Essentials';
+
+  const categoryName = (typeof categoryNameInput === 'string' && categoryNameInput.trim())
+    ? categoryNameInput.trim()
+    : ((typeof categoryInput === 'string' && categoryInput.trim()) ? categoryInput.trim() : 'Daily Essentials');
+
   const slug = slugify(categoryName);
   const [rows] = await pool.execute("SELECT id FROM categories WHERE name = ? OR slug = ? LIMIT 1", [categoryName, slug]);
   if (rows.length > 0) {
     return rows[0].id;
   }
+
   const [ins] = await pool.execute(
     "INSERT INTO categories (name, slug, description, is_active) VALUES (?, ?, ?, 1)",
     [categoryName, slug, `${categoryName} category`, 1]
@@ -77,10 +103,7 @@ async function generateProductItemId() {
 }
 
 const addProduct = asyncHandler(async (req, res) => {
-  // Product creation requires role seller/admin and approval_status = 'approved' and user status active
-  const seller = req.user.role === "admin"
-    ? (await findSellerByUserId(req.user.id)) || { id: 1 }
-    : await requireApprovedSeller(req.user);
+  const seller = await ensureSellerProfile(req.user);
 
   const body = req.body;
   const name = body.name ? String(body.name).trim() : '';
@@ -88,7 +111,7 @@ const addProduct = asyncHandler(async (req, res) => {
     throw new AppError("Product name must be between 2 and 180 characters", 400);
   }
 
-  const categoryId = await resolveCategoryId(body.categoryId ?? body.category);
+  const categoryId = await resolveCategoryId(body.categoryId, body.category);
   const sellingPrice = Number(body.sellingPrice ?? body.price ?? 0);
   const mrp = Number(body.mrp ?? body.originalPrice ?? sellingPrice);
 

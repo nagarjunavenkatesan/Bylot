@@ -9,8 +9,11 @@ import Loader from '../components/Loader';
 import { fetchProducts, fetchNearbyProducts, adminDeleteProduct } from '../api/backendApi';
 import { useAuth } from '../context/AuthContext';
 import { useLocation, PRESET_CITIES } from '../context/LocationContext';
+import SEOHead from '../components/SEOHead';
+import { pageSEO, itemListSEO } from '../utils/seo';
 import '../styles/Home.css';
 import '../styles/Browse.css';
+
 
 const CATEGORIES = [
     'All',
@@ -178,8 +181,16 @@ const Home = () => {
         }
     };
 
+    const homeSEO = pageSEO({
+        title: 'Hyperlocal Discount & Near-Expiry Marketplace',
+        description: "Bylot is India's hyperlocal marketplace for near-expiry, surplus and discounted goods. Save up to 70% on fresh produce, dairy, bakery and daily essentials.",
+        path: '/',
+        structuredData: filteredProducts.length > 0 ? itemListSEO(filteredProducts, 'Featured Surplus Products') : null,
+    });
+
     return (
         <PageTransition>
+            <SEOHead {...homeSEO} />
             <div className="home-browsing-page">
                 {/* ── Hero Banner Section ────────────────────────────────── */}
                 <section className="hero" style={{ minHeight: 'auto', padding: '2.5rem 0 1.5rem 0', position: 'relative', overflow: 'hidden' }}>

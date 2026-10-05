@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import { apiRequest } from '../api/backendApi';
+
+const verifySEO = pageSEO({
+    title: 'Verify Email',
+    description: 'Verify your Bylot account email address.',
+    path: '/verify-email',
+    noindex: true,
+});
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -35,6 +44,7 @@ export default function VerifyEmail() {
 
   return (
     <div style={{ maxWidth: 440, margin: '60px auto', padding: '30px', background: 'var(--card-bg, #fff)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+      <SEOHead {...verifySEO} />
       <h2 style={{ marginBottom: 16, fontSize: '1.6rem' }}>Account Email Verification</h2>
 
       {loading && (

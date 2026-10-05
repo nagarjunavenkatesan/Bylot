@@ -3,7 +3,17 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { GoogleLogin } from '@react-oauth/google';
 import PageTransition from '../components/PageTransition';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import { useAuth } from '../context/AuthContext';
+
+const loginSEO = pageSEO({
+    title: 'Sign In',
+    description: 'Sign in to your Bylot account to access your deals and listings.',
+    path: '/login',
+    noindex: true,
+});
+
 import { apiRequest } from '../api/backendApi';
 import { useGoogleAuth } from '../components/GoogleProvider';
 
@@ -108,6 +118,7 @@ const Login = () => {
 
     return (
         <PageTransition>
+            <SEOHead {...loginSEO} />
             <div className="container" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
                 <div className="card" style={{ maxWidth: '440px', width: '100%', padding: '2.5rem' }}>
                     <h2 className="section-title" style={{ fontSize: '2rem', marginBottom: '0.5rem', textAlign: 'center' }}>Welcome Back</h2>

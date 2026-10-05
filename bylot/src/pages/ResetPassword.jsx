@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import SEOHead from '../components/SEOHead';
+import { pageSEO } from '../utils/seo';
 import { apiRequest } from '../api/backendApi';
+
+const resetSEO = pageSEO({
+    title: 'Reset Password',
+    description: 'Reset your Bylot account password.',
+    path: '/reset-password',
+    noindex: true,
+});
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -45,6 +54,7 @@ export default function ResetPassword() {
 
   return (
     <div style={{ maxWidth: 440, margin: '60px auto', padding: '30px', background: 'var(--card-bg, #fff)', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+      <SEOHead {...resetSEO} />
       <h2 style={{ marginBottom: 8, fontSize: '1.6rem' }}>Reset Your Password</h2>
       <p style={{ color: '#666', marginBottom: 24, fontSize: '0.95rem' }}>
         Enter a strong, secure new password for your account.
