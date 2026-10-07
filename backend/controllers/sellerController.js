@@ -18,14 +18,6 @@ async function requireSeller(userId) {
 async function ensureSellerProfile(user) {
   let seller = await findSellerByUserId(user.id);
   if (seller) {
-    if (seller.approval_status !== "approved" || seller.status !== "active") {
-      await pool.execute(
-        "UPDATE sellers SET approval_status = 'approved', status = 'active' WHERE id = ?",
-        [seller.id]
-      );
-      seller.approval_status = "approved";
-      seller.status = "active";
-    }
     return seller;
   }
 
@@ -48,7 +40,11 @@ async function requireApprovedSeller(user) {
   if (user.status !== "active") {
     throw new AppError("Your user account is suspended or inactive", 403);
   }
-  return ensureSellerProfile(user);
+  const seller = await ensureSellerProfile(user);
+  if (seller.approval_status !== "approved" || seller.status !== "active") {
+    throw new AppError("Your seller account is pending approval or inactive", 403);
+  }
+  return seller;
 }
 
 function discountPercent(mrp, sellingPrice) {
@@ -103,7 +99,7 @@ async function generateProductItemId() {
 }
 
 const addProduct = asyncHandler(async (req, res) => {
-  const seller = await ensureSellerProfile(req.user);
+  const seller = req.user.role === 'admin' ? await ensureSellerProfile(req.user) : await requireApprovedSeller(req.user);
 
   const body = req.body;
   const name = body.name ? String(body.name).trim() : '';

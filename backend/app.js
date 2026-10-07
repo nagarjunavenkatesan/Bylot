@@ -111,6 +111,7 @@ app.use("/uploads", (req, res, next) => {
 }));
 
 // Health check endpoints - /health verifies process and DB health
+// Health check endpoints — returns minimal status without exposing environment or stack traces
 app.get("/health", async (req, res) => {
   try {
     const connection = await pool.getConnection();
@@ -119,12 +120,7 @@ app.get("/health", async (req, res) => {
       res.json({
         success: true,
         message: "Bylot API and Database are healthy",
-        data: {
-          uptime: Math.floor(process.uptime()),
-          environment: env.nodeEnv,
-          database: "connected",
-          timestamp: new Date().toISOString()
-        }
+        data: { status: "up", database: "connected" }
       });
     } finally {
       connection.release();
@@ -133,12 +129,7 @@ app.get("/health", async (req, res) => {
     res.status(503).json({
       success: false,
       message: "Database connection unavailable",
-      data: {
-        uptime: Math.floor(process.uptime()),
-        environment: env.nodeEnv,
-        database: "disconnected",
-        timestamp: new Date().toISOString()
-      }
+      data: { status: "down", database: "disconnected" }
     });
   }
 });

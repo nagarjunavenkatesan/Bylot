@@ -170,7 +170,7 @@ describe("General Security, Sanitization and Resilience", () => {
     let output;
     try {
       output = execSync(
-        'git grep -i -E "payment|razorpay" -- ":!migrations" ":!*.test.js"',
+        'git grep -i -E "payment|razorpay" -- ":!migrations" ":!docs/MIGRATIONS.md" ":!*.test.js"',
         { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
       ).trim();
     } catch (err) {

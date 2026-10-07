@@ -76,11 +76,25 @@ async function processUploadedImage(req, res, next) {
     const filename = `${uuid()}.webp`;
     const targetPath = path.join(folderPath, filename);
 
-    // Re-encode with sharp to strip metadata and any embedded malicious payloads
+    // Re-encode with sharp: max dimension 1920x1080, strip metadata, quality 82
     await sharp(req.file.buffer)
       .rotate()
-      .webp({ quality: 85 })
+      .resize({ width: 1920, height: 1080, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 82 })
       .toFile(targetPath);
+
+    // Generate optimized thumbnail version for listing cards
+    const thumbFilename = filename.replace(".webp", "_thumb.webp");
+    const thumbPath = path.join(folderPath, thumbFilename);
+    try {
+      await sharp(req.file.buffer)
+        .rotate()
+        .resize({ width: 400, height: 300, fit: "cover" })
+        .webp({ quality: 78 })
+        .toFile(thumbPath);
+    } catch {
+      // Graceful fallback if thumbnail generation fails
+    }
 
     const targetStat = fs.statSync(targetPath);
     recordUploadUsage(req.user?.id, targetStat.size);

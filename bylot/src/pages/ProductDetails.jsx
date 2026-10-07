@@ -117,7 +117,17 @@ const ProductDetails = () => {
                 </nav>
                 <div className="details-grid">
                     <div className="product-image-section">
-                        <img src={product.image || 'https://via.placeholder.com/400'} alt={product.name} className="main-image" />
+                        <img
+                            src={product.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80'}
+                            alt={product.name ? `${product.name} - Near-Expiry Product Deal` : 'Product Image'}
+                            className="main-image"
+                            width="500"
+                            height="400"
+                            loading="eager"
+                            fetchPriority="high"
+                            decoding="async"
+                            onError={e => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80'; }}
+                        />
                     </div>
                     <div className="product-info-section">
                         <div className="product-header">

@@ -15,7 +15,7 @@ router.get("/profile", controller.getSellerProfile);
 router.post("/profile", sellerValidators.upsertProfile, validate, controller.upsertSellerProfile);
 
 // Image upload - restricted to approved sellers and admins with per-user rate limit & daily quota
-router.post("/uploads/product-image", uploadLimiter, checkUploadQuota, upload.single("productImage"), processUploadedImage, controller.uploadProductImage);
+router.post("/uploads/product-image", authorize("seller", "admin"), uploadLimiter, checkUploadQuota, upload.single("productImage"), processUploadedImage, controller.uploadProductImage);
 
 // Product management
 router.get("/dashboard", authorize("seller", "admin"), controller.sellerDashboard);

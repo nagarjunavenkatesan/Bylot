@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/Header.css';
 import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../api/backendApi';
 
 const Header = ({ theme, toggleTheme }) => {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -21,7 +22,6 @@ const Header = ({ theme, toggleTheme }) => {
         let cancelled = false;
         (async () => {
             try {
-                const { apiRequest } = await import('../api/backendApi');
                 const res = await apiRequest('/api/sellers/profile');
                 if (!cancelled && res?.data?.approval_status === 'approved') {
                     setSellerApproved(true);

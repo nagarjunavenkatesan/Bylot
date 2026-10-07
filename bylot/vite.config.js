@@ -46,7 +46,12 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('react-dom') || id.includes('react-router-dom') || id.includes('/react/')) {
+              if (
+                id.includes('node_modules/react/') ||
+                id.includes('node_modules/react-dom/') ||
+                id.includes('node_modules/react-router/') ||
+                id.includes('node_modules/react-router-dom/')
+              ) {
                 return 'vendor-react';
               }
               if (id.includes('framer-motion')) {
@@ -57,6 +62,9 @@ export default defineConfig(({ mode }) => {
               }
               if (id.includes('react-parallax-tilt')) {
                 return 'vendor-tilt';
+              }
+              if (id.includes('@react-oauth')) {
+                return 'vendor-auth';
               }
               return 'vendor-libs';
             }

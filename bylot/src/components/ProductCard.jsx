@@ -65,12 +65,21 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
             <Link to={`/product/${product.id}`} style={{ display: 'block', color: 'inherit' }}>
                 <div className="listing-image-container">
                     <img
-                        src={product.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'}
-                        alt={product.name || 'Product'}
+                        src={(product.image || '').includes('.webp') && !(product.image || '').includes('_thumb.webp') ? product.image.replace('.webp', '_thumb.webp') : (product.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80')}
+                        alt={product.name ? `Buy ${product.name} near-expiry deal` : 'Product image'}
                         className="card-image"
+                        width="300"
+                        height="225"
                         loading="lazy"
                         decoding="async"
-                        onError={e => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80'; }}
+                        onError={e => {
+                            if (e.target.src.includes('_thumb.webp')) {
+                                e.target.src = product.image;
+                            } else {
+                                e.target.onerror = null;
+                                e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
+                            }
+                        }}
                     />
                     <span
                         className="expiry-tag"
