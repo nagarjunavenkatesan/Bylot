@@ -31,6 +31,11 @@ function setLink(rel, href, extra = {}) {
 }
 
 function setJsonLd(id, data) {
+  if (!data) {
+    const stale = document.head.querySelector(`script[data-seo-id="${id}"]`);
+    if (stale) stale.remove();
+    return;
+  }
   let el = document.head.querySelector(`script[data-seo-id="${id}"]`);
   if (!el) {
     el = document.createElement('script');
@@ -97,10 +102,15 @@ export function useSEO(seoConfig = {}) {
 
     // Page specific structured data
     if (structuredData) {
-      setJsonLd('page', structuredData);
+      if (Array.isArray(structuredData)) {
+        structuredData.forEach((sd, idx) => setJsonLd(`page-${idx}`, sd));
+      } else {
+        setJsonLd('page', structuredData);
+      }
     } else {
-      const stale = document.head.querySelector('script[data-seo-id="page"]');
-      if (stale) stale.remove();
+      const stalePage = document.head.querySelector('script[data-seo-id="page"]');
+      if (stalePage) stalePage.remove();
+      document.head.querySelectorAll('script[data-seo-id^="page-"]').forEach(el => el.remove());
     }
   }, [title, description, canonicalUrl, image, type, noindex, keywords, structuredData]);
 }

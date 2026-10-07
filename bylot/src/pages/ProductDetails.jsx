@@ -1,10 +1,10 @@
 import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import Button from '../components/Button';
 import PageTransition from '../components/PageTransition';
 import { fetchProductById, deleteProduct, adminDeleteProduct, apiRequest } from '../api/backendApi';
 import SEOHead from '../components/SEOHead';
-import { productSEO, pageSEO } from '../utils/seo';
+import { productSEO, pageSEO, breadcrumbSEO } from '../utils/seo';
 import '../styles/ProductDetails.css';
 import { getProductPricing } from '../utils/pricing';
 
@@ -30,6 +30,17 @@ const ProductDetails = () => {
     }, [id]);
 
     const seoProps = product ? productSEO(product) : pageSEO({ title: 'Product Details', path: `/product/${id}` });
+
+    if (product) {
+        const catName = product.category || 'Daily Essentials';
+        const catSlug = catName.toLowerCase().replace(/\s+/g, '-');
+        const bSEO = breadcrumbSEO([
+            { name: 'Home', path: '/' },
+            { name: catName, path: `/category/${catSlug}` },
+            { name: product.name, path: `/product/${product.id}` }
+        ]);
+        seoProps.structuredData = [seoProps.structuredData, bSEO];
+    }
 
     if (!product) {
         return (
@@ -95,6 +106,15 @@ const ProductDetails = () => {
         <PageTransition>
             <SEOHead {...seoProps} />
             <div className="product-details-page container">
+                <nav aria-label="Breadcrumb" style={{ marginBottom: '1.25rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    <Link to="/" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Home</Link>
+                    <span style={{ margin: '0 0.5rem' }}>/</span>
+                    <Link to={`/category/${(product.category || 'daily-essentials').toLowerCase().replace(/\s+/g, '-')}`} style={{ color: 'var(--primary)', textDecoration: 'none' }}>
+                        {product.category || 'Daily Essentials'}
+                    </Link>
+                    <span style={{ margin: '0 0.5rem' }}>/</span>
+                    <span style={{ fontWeight: 600 }}>{product.name}</span>
+                </nav>
                 <div className="details-grid">
                     <div className="product-image-section">
                         <img src={product.image || 'https://via.placeholder.com/400'} alt={product.name} className="main-image" />

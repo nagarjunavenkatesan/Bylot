@@ -65,6 +65,8 @@ const Header = ({ theme, toggleTheme }) => {
 
                 <nav ref={navRef} className={`nav ${isMenuOpen ? 'nav-open' : ''}`} id="main-nav">
                     <Link to="/" className="nav-link" onClick={() => setIsMenuOpen(false)}>Home</Link>
+                    <Link to="/browse" className="nav-link" onClick={() => setIsMenuOpen(false)}>Browse Deals</Link>
+                    <Link to="/about" className="nav-link" onClick={() => setIsMenuOpen(false)}>About Us</Link>
                     <Link to={user ? "/sell" : "/login"} className="nav-link" onClick={() => setIsMenuOpen(false)}>Sell</Link>
                     {sellerApproved && (
                         <Link to="/seller/orders" className="nav-link" onClick={() => setIsMenuOpen(false)}>Seller orders</Link>

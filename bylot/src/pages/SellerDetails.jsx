@@ -23,9 +23,8 @@ const SellerDetails = () => {
                 const product = list[0];
                 if (!product) throw new Error('Seller not found');
                 setSeller({
-                    displayName: product.seller_name || 'Unknown Seller',
-                    rating: 4.8,
-                    joined: 'N/A',
+                    displayName: product.seller_name || 'Verified Seller',
+                    joined: 'Bylot Merchant',
                     location: product.city || product.location || 'Location not set',
                     description: 'No description provided yet.',
                     image: `https://ui-avatars.com/api/?name=${encodeURIComponent(product.seller_name || 'S')}&background=random`,
@@ -73,7 +72,7 @@ const SellerDetails = () => {
                         <div className="seller-info">
                             <h1>{seller.displayName}</h1>
                             <p className="location">{seller.location}</p>
-                            <div className="rating"><span className="star">★</span> {seller.rating} • Joined {seller.joined}</div>
+                            <div className="rating"><span className="star">✓</span> Verified Merchant</div>
                         </div>
                     </div>
                     <div className="seller-body">

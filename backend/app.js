@@ -188,7 +188,11 @@ app.get("/api/config", (req, res) => {
 app.post("/api/register", authLimiter, authValidators.register, validate, authController.register);
 app.post("/api/login", authLimiter, authValidators.login, validate, authController.login);
 
-// API Routes
+const seoRoutes = require("./routes/seoRoutes");
+
+// API & Dynamic SEO Routes
+app.use("/", seoRoutes);
+app.use("/api/seo", seoRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);

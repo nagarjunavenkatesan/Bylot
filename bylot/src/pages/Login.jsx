@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { GoogleLogin } from '@react-oauth/google';
 import PageTransition from '../components/PageTransition';
@@ -36,8 +36,6 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [resendMsg, setResendMsg] = useState('');
-    const [resendLoading, setResendLoading] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -94,26 +92,6 @@ const Login = () => {
 
     const handleGoogleError = () => {
         setError('Google sign-in was cancelled or encountered an error.');
-    };
-
-    const handleResendVerification = async () => {
-        if (!email.trim()) {
-            setResendMsg('Enter your email above first.');
-            return;
-        }
-        setResendLoading(true);
-        setResendMsg('');
-        try {
-            await apiRequest('/api/auth/resend-verification', {
-                method: 'POST',
-                body: JSON.stringify({ email: email.trim() }),
-            });
-            setResendMsg('If that account exists and is unverified, we sent a new verification email.');
-        } catch (err) {
-            setResendMsg(err.message || 'Could not send verification email.');
-        } finally {
-            setResendLoading(false);
-        }
     };
 
     return (
@@ -251,33 +229,6 @@ const Login = () => {
                                 ℹ️ Google Sign-In requires <code>VITE_GOOGLE_CLIENT_ID</code> to be configured in your environment.
                             </div>
                         )}
-                    </div>
-
-                    <div style={{ marginTop: '1.25rem', textAlign: 'center' }}>
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            style={{ width: '100%', minHeight: '44px', fontSize: '0.92rem' }}
-                            disabled={resendLoading}
-                            onClick={handleResendVerification}
-                        >
-                            {resendLoading ? 'Sending…' : 'Resend verification email'}
-                        </button>
-                        {resendMsg && (
-                            <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{resendMsg}</p>
-                        )}
-                    </div>
-
-                    <div style={{ marginTop: '1.75rem', textAlign: 'center' }}>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>
-                            Don't have an account?{' '}
-                            <Link to="/register" style={{ color: 'var(--primary)', fontWeight: '700', textDecoration: 'none' }}>
-                                Create Account
-                            </Link>
-                        </p>
-                        <p style={{ marginTop: '0.5rem', fontSize: '0.92rem' }}>
-                            <Link to="/reset-password" style={{ color: 'var(--primary)', fontWeight: '600' }}>Forgot password?</Link>
-                        </p>
                     </div>
                 </div>
             </div>
