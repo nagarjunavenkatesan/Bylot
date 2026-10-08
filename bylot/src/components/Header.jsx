@@ -15,22 +15,20 @@ const Header = ({ theme, toggleTheme }) => {
     };
 
     useEffect(() => {
-        if (!user) {
-            setSellerApproved(false);
-            return;
-        }
         let cancelled = false;
-        (async () => {
-            try {
-                const res = await apiRequest('/api/sellers/profile');
-                if (!cancelled && res?.data?.approval_status === 'approved') {
-                    setSellerApproved(true);
-                }
-            } catch {
-                if (!cancelled) setSellerApproved(false);
-            }
-        })();
-        return () => { cancelled = true; };
+        if (user) {
+            apiRequest('/api/sellers/profile')
+                .then(res => {
+                    if (!cancelled) setSellerApproved(res?.data?.approval_status === 'approved');
+                })
+                .catch(() => {
+                    if (!cancelled) setSellerApproved(false);
+                });
+        }
+        return () => {
+            cancelled = true;
+            setSellerApproved(false);
+        };
     }, [user]);
 
     useEffect(() => {
@@ -65,7 +63,6 @@ const Header = ({ theme, toggleTheme }) => {
 
                 <nav ref={navRef} className={`nav ${isMenuOpen ? 'nav-open' : ''}`} id="main-nav">
                     <Link to="/" className="nav-link" onClick={() => setIsMenuOpen(false)}>Home</Link>
-                    <Link to="/browse" className="nav-link" onClick={() => setIsMenuOpen(false)}>Browse Deals</Link>
                     <Link to="/about" className="nav-link" onClick={() => setIsMenuOpen(false)}>About Us</Link>
                     <Link to={user ? "/sell" : "/login"} className="nav-link" onClick={() => setIsMenuOpen(false)}>Sell</Link>
                     {sellerApproved && (

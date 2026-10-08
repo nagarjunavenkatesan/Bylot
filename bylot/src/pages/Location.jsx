@@ -6,11 +6,15 @@ import ProductCard from '../components/ProductCard';
 import Loader from '../components/Loader';
 import { fetchProducts } from '../api/backendApi';
 import { locationSEO, slugToTitle, itemListSEO } from '../utils/seo';
+import NotFound from './NotFound';
 import '../styles/Browse.css';
+
+const VALID_CITIES = ['bengaluru', 'chennai', 'coimbatore', 'trichy', 'mumbai', 'hyderabad'];
 
 const Location = () => {
     const { city, category } = useParams();
     const citySlug = (city || 'bengaluru').toLowerCase();
+    const isValidCity = VALID_CITIES.includes(citySlug);
     const cityName = slugToTitle(citySlug);
     const categoryName = category ? slugToTitle(category) : '';
 
@@ -41,6 +45,10 @@ const Location = () => {
     }, [loadLocationProducts]);
 
     const seoProps = locationSEO(cityName, citySlug, categoryName);
+
+    if (!isValidCity) {
+        return <NotFound />;
+    }
 
     if (products.length > 0) {
         const itemSchema = itemListSEO(products, `Discounted Items in ${cityName}`);

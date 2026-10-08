@@ -72,6 +72,17 @@ async function processUploadedImage(req, res, next) {
       fs.mkdirSync(folderPath, { recursive: true });
     }
 
+    // Inspect image metadata to prevent image decompression bomb attacks
+    const metadata = await sharp(req.file.buffer).metadata();
+    if (!metadata || !metadata.width || !metadata.height) {
+      return next(new AppError("Corrupted image file or unreadable dimensions.", 400));
+    }
+    const MAX_DIMENSION = 8000;
+    const MAX_PIXELS = 25000000; // 25 Megapixels
+    if (metadata.width > MAX_DIMENSION || metadata.height > MAX_DIMENSION || (metadata.width * metadata.height) > MAX_PIXELS) {
+      return next(new AppError("Image dimensions exceed maximum allowed limits (max 8000x8000 pixels).", 400));
+    }
+
     // Always generate a random server-side filename and re-encode to WebP
     const filename = `${uuid()}.webp`;
     const targetPath = path.join(folderPath, filename);

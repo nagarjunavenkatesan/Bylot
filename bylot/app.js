@@ -53,16 +53,23 @@ const server = http.createServer((req, res) => {
         return;
       }
 
-      // Fallback for React Router SPA (index.html)
-      fs.readFile(INDEX_HTML, (indexErr, content) => {
+      // Fallback for React Router SPA (index.html) with 404 route detection
+      fs.readFile(INDEX_HTML, "utf8", (indexErr, content) => {
         if (indexErr) {
           res.writeHead(500, { "Content-Type": "text/plain" });
           res.end("500 Internal Server Error: dist/index.html not found. Please run 'npm run build'.");
           return;
         }
-        res.writeHead(200, {
+
+        const validStaticRoutes = ["/", "/browse", "/about", "/contact", "/faq", "/terms", "/privacy", "/login", "/register", "/reset-password", "/verify-email", "/sell", "/profile", "/admin", "/seller/orders"];
+        const isDynamicPrefix = ["/product/", "/category/", "/location/", "/seller/", "/edit-item/"].some(prefix => safePath.startsWith(prefix));
+        const isValidRoute = validStaticRoutes.includes(safePath) || isDynamicPrefix;
+
+        const statusCode = isValidRoute ? 200 : 404;
+
+        res.writeHead(statusCode, {
           "Content-Type": "text/html; charset=UTF-8",
-          "Cache-Control": "no-cache, no-store, must-revalidate"
+          "Cache-Control": statusCode === 200 ? "public, max-age=300" : "no-cache, no-store, must-revalidate"
         });
         res.end(content);
       });

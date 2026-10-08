@@ -54,7 +54,6 @@ export function useSEO(seoConfig = {}) {
     image,
     type = 'website',
     noindex = false,
-    keywords = '',
     structuredData = null,
   } = seoConfig;
 
@@ -64,7 +63,10 @@ export function useSEO(seoConfig = {}) {
     }
 
     setMeta('description', description);
-    setMeta('keywords', keywords);
+    // Remove stale keywords meta tag if present
+    const staleKeywords = document.head.querySelector('meta[name="keywords"]');
+    if (staleKeywords) staleKeywords.remove();
+
     setMeta('robots', noindex ? 'noindex, nofollow' : 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1');
     setMeta('author', SITE.founder);
     setMeta('theme-color', SITE.themeColor);
@@ -112,7 +114,7 @@ export function useSEO(seoConfig = {}) {
       if (stalePage) stalePage.remove();
       document.head.querySelectorAll('script[data-seo-id^="page-"]').forEach(el => el.remove());
     }
-  }, [title, description, canonicalUrl, image, type, noindex, keywords, structuredData]);
+  }, [title, description, canonicalUrl, image, type, noindex, structuredData]);
 }
 
 export default useSEO;

@@ -6,6 +6,7 @@ import ProductCard from '../components/ProductCard';
 import Loader from '../components/Loader';
 import { fetchProducts } from '../api/backendApi';
 import { categorySEO, slugToTitle, itemListSEO } from '../utils/seo';
+import NotFound from './NotFound';
 import '../styles/Browse.css';
 
 const CATEGORY_SLUG_MAP = {
@@ -20,9 +21,22 @@ const CATEGORY_SLUG_MAP = {
     'corporate-clearance': 'Corporate Clearance'
 };
 
+const VALID_CATEGORY_SLUGS = [
+    'groceries',
+    'daily-essentials',
+    'near-expiry',
+    'discount-products',
+    'dairy',
+    'vegetables',
+    'fruits',
+    'bakery',
+    'corporate-clearance'
+];
+
 const Category = () => {
     const { slug } = useParams();
     const formattedSlug = (slug || '').toLowerCase();
+    const isValidCategory = Boolean(CATEGORY_SLUG_MAP[formattedSlug] || VALID_CATEGORY_SLUGS.includes(formattedSlug));
     const categoryName = CATEGORY_SLUG_MAP[formattedSlug] || slugToTitle(formattedSlug);
 
     const [products, setProducts] = useState([]);
@@ -51,6 +65,10 @@ const Category = () => {
     }, [loadCategoryProducts]);
 
     const seoProps = categorySEO(categoryName, formattedSlug, products.length);
+
+    if (!isValidCategory) {
+        return <NotFound />;
+    }
 
     if (products.length > 0) {
         seoProps.structuredData = [

@@ -321,55 +321,78 @@ const AdminPanel = () => {
                                 <div className="admin-id-search-input">
                                     <FaSearch />
                                     <input value={productIdSearch} onChange={e => setProductIdSearch(e.target.value)}
-                                        placeholder="Search by product ID (e.g. PRD-XXXXXX)"
+                                        placeholder="Search by Product ID or DB ID (e.g. PRD-XXXXXX or 145)"
                                         onKeyDown={e => { if (e.key === 'Enter') handleProductIdSearch(); }} />
                                     <button type="button" className="admin-id-search-btn" onClick={handleProductIdSearch} disabled={productIdLoading}>
-                                        {productIdLoading ? 'Searching...' : 'Find'}
+                                        {productIdLoading ? 'Searching...' : 'Find Product'}
                                     </button>
                                 </div>
                                 {productIdResult && (
                                     <div className="admin-id-result">
                                         <div className="admin-id-result-header">
-                                            <span className="admin-product-id">{productIdResult.product_item_id}</span>
+                                            <div>
+                                                <span className="admin-product-id" style={{ fontSize: '1rem', marginRight: '0.75rem' }}>
+                                                    {productIdResult.product_item_id || `ID #${productIdResult.id}`}
+                                                </span>
+                                                <small style={{ color: 'var(--text-muted)' }}>(Database ID: #{productIdResult.id})</small>
+                                            </div>
                                             <StatusPill status={productIdResult.status} />
                                         </div>
                                         <div className="admin-id-result-body">
                                             <div><strong>{productIdResult.name}</strong></div>
-                                            <div>Seller: {productIdResult.seller_name} | Category: {productIdResult.category_name}</div>
-                                            <div>Price: Rs {Number(productIdResult.selling_price || 0).toLocaleString('en-IN')}</div>
+                                            <div>Seller: {productIdResult.seller_name || 'Store'} | Category: {productIdResult.category_name || 'General'}</div>
+                                            <div>Price: Rs {Number(productIdResult.selling_price || 0).toLocaleString('en-IN')} {productIdResult.mrp ? `(MRP: Rs ${Number(productIdResult.mrp).toLocaleString('en-IN')})` : ''}</div>
+                                            <div>Stock: {productIdResult.stock_quantity ?? 0} units</div>
                                         </div>
-                                        <div className="admin-id-result-actions">
+                                        <div className="admin-id-result-actions" style={{ flexWrap: 'wrap', gap: '0.6rem' }}>
+                                            <a href={`/product/${productIdResult.id}`} target="_blank" rel="noopener noreferrer" className="admin-mini-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', textDecoration: 'none' }}>
+                                                <FaEye /> Access Product
+                                            </a>
+                                            <a href={`/edit-item/${productIdResult.id}`} target="_blank" rel="noopener noreferrer" className="admin-mini-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', textDecoration: 'none' }}>
+                                                <FaLock /> Edit
+                                            </a>
                                             <select value={productIdResult.status} onChange={e => runAction(async () => {
                                                 await adminRequest(`/api/admin/products/${productIdResult.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: e.target.value }) });
                                                 setProductIdResult(prev => ({ ...prev, status: e.target.value }));
                                             }, 'Product status updated.')}>
                                                 {productStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
-                                            <button type="button" className="admin-mini-btn reject" onClick={() => runAction(async () => {
-                                                await adminRequest(`/api/admin/products/${productIdResult.id}`, { method: 'DELETE' });
-                                                setProductIdResult(null);
-                                                setProductIdSearch('');
-                                            }, 'Product deleted.')}>
-                                                <FaTrash /> Delete
+                                            <button type="button" className="admin-mini-btn reject" onClick={() => {
+                                                if (window.confirm(`Are you sure you want to delete "${productIdResult.name}"?`)) {
+                                                    runAction(async () => {
+                                                        await adminRequest(`/api/admin/products/${productIdResult.id}`, { method: 'DELETE' });
+                                                        setProductIdResult(null);
+                                                        setProductIdSearch('');
+                                                    }, 'Product deleted successfully.');
+                                                }
+                                            }}>
+                                                <FaTrash /> Delete Product
                                             </button>
                                         </div>
                                     </div>
                                 )}
                             </div>
                             <AdminTable emptyText="No products found."
-                                columns={['Product ID', 'Product', 'Seller', 'Price', 'Status', 'Action']}
+                                columns={['Product ID', 'Product', 'Seller', 'Price', 'Status', 'Actions']}
                                 rows={filteredProducts.map(item => [
-                                    <span className="admin-product-id">{item.product_item_id || '—'}</span>,
+                                    <span className="admin-product-id">{item.product_item_id || `#${item.id}`}</span>,
                                     item.name,
                                     item.seller_name || item.category_name,
                                     `Rs ${Number(item.selling_price || item.price || 0).toLocaleString('en-IN')}`,
                                     <StatusPill status={item.status} />,
                                     <div className="admin-action-row">
+                                        <a href={`/product/${item.id}`} target="_blank" rel="noopener noreferrer" className="admin-icon-btn" aria-label={`Access ${item.name}`} title="View/Access Product" style={{ display: 'inline-grid', placeItems: 'center', textDecoration: 'none' }}>
+                                            <FaEye />
+                                        </a>
                                         <select value={item.status} onChange={e => runAction(() => adminRequest(`/api/admin/products/${item.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: e.target.value }) }), 'Product status updated.')}>
                                             {productStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                                         </select>
-                                        <button type="button" className="admin-icon-btn danger" aria-label={`Delete ${item.name}`}
-                                            onClick={() => runAction(() => adminRequest(`/api/admin/products/${item.id}`, { method: 'DELETE' }), 'Product deleted.')}>
+                                        <button type="button" className="admin-icon-btn danger" aria-label={`Delete ${item.name}`} title="Delete Product"
+                                            onClick={() => {
+                                                if (window.confirm(`Delete product "${item.name}"?`)) {
+                                                    runAction(() => adminRequest(`/api/admin/products/${item.id}`, { method: 'DELETE' }), 'Product deleted successfully.');
+                                                }
+                                            }}>
                                             <FaTrash />
                                         </button>
                                     </div>

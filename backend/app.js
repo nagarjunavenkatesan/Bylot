@@ -77,7 +77,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "x-api-key"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"]
 }));
 
 app.use(express.json({ limit: "5mb" }));
@@ -196,19 +196,25 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/security", securityRoutes);
 app.use("/mcp", mcpRoutes);
 
-// Serve built React frontend in production with caching
+const { validateAndGetPageSeo, renderHtmlWithSeo } = require("./services/seoRenderer");
+
+// Serve built React frontend in production with caching & SSR route validation
 const frontendDist = path.resolve(__dirname, "..", "bylot", "dist");
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist, {
     maxAge: "1d",
     etag: true,
+    index: false,
     setHeaders: (res, filePath) => {
       if (filePath.endsWith(".html")) {
         res.setHeader("Cache-Control", "no-cache");
       }
     }
   }));
-  app.get("*", (req, res, next) => {
+
+  const indexHtmlPath = path.join(frontendDist, "index.html");
+
+  app.get("*", async (req, res, next) => {
     if (
       req.path.startsWith("/api") ||
       req.path.startsWith("/uploads") ||
@@ -217,11 +223,23 @@ if (fs.existsSync(frontendDist)) {
       req.path.includes("/.") ||
       req.path.endsWith(".env") ||
       req.path.endsWith(".key") ||
-      req.path.endsWith(".pem")
+      req.path.endsWith(".pem") ||
+      /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map|webp|avif|json|txt|xml)$/i.test(req.path)
     ) {
       return next();
     }
-    res.sendFile(path.join(frontendDist, "index.html"));
+
+    try {
+      const template = fs.readFileSync(indexHtmlPath, "utf8");
+      const { status, ...seoOptions } = await validateAndGetPageSeo(req.path, req.query);
+      const renderedHtml = renderHtmlWithSeo(template, seoOptions);
+
+      res.status(status).setHeader("Content-Type", "text/html; charset=UTF-8");
+      res.setHeader("Cache-Control", status === 200 ? "public, max-age=300" : "no-cache, no-store, must-revalidate");
+      res.send(renderedHtml);
+    } catch (err) {
+      next(err);
+    }
   });
 }
 

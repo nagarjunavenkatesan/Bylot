@@ -49,7 +49,6 @@ export function pageSEO({
   image,
   type = 'website',
   noindex = false,
-  keywords = '',
   structuredData = null,
 } = {}) {
   const fullTitle = title
@@ -69,7 +68,6 @@ export function pageSEO({
     image: ogImageUrl,
     type,
     noindex,
-    keywords,
     structuredData,
   };
 }
@@ -135,7 +133,6 @@ export function productSEO(product) {
     path,
     image,
     type: 'product',
-    keywords: `${product.name}, buy ${product.name} discount, near expiry ${product.name}, Bylot ${product.location || 'deals'}`,
     structuredData,
   });
 }
@@ -160,7 +157,6 @@ export function categorySEO(categoryName, slug, count = 0) {
     description,
     path,
     image,
-    keywords: `${categoryName} discounts, near expiry ${categoryName}, surplus ${categoryName} India, buy ${categoryName} cheap`,
     structuredData: breadcrumbs,
   });
 }
@@ -210,7 +206,6 @@ export function locationSEO(cityName, citySlug, categoryName = '') {
     title,
     description,
     path,
-    keywords: `discounted groceries ${cleanCity}, near expiry products ${cleanCity}, surplus food ${cleanCity}, cheap provisions ${cleanCity}`,
     structuredData,
   });
 }

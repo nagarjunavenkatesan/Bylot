@@ -7,11 +7,14 @@ import SEOHead from '../components/SEOHead';
 import { productSEO, pageSEO, breadcrumbSEO } from '../utils/seo';
 import '../styles/ProductDetails.css';
 import { getProductPricing } from '../utils/pricing';
+import NotFound from './NotFound';
 
 const ProductDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [product, setProduct] = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState(null);
     const [currentUser, setCurrentUser] = React.useState(null);
 
     React.useEffect(() => {
@@ -24,9 +27,23 @@ const ProductDetails = () => {
             }
         }
 
+        let isMounted = true;
+        setLoading(true);
+        setError(null);
         fetchProductById(id)
-            .then(setProduct)
-            .catch(err => console.error('Error fetching product:', err));
+            .then(data => {
+                if (isMounted) {
+                    if (!data) setError('Product not found');
+                    else setProduct(data);
+                }
+            })
+            .catch(err => {
+                if (isMounted) setError(err.message || 'Product not found');
+            })
+            .finally(() => {
+                if (isMounted) setLoading(false);
+            });
+        return () => { isMounted = false; };
     }, [id]);
 
     const seoProps = product ? productSEO(product) : pageSEO({ title: 'Product Details', path: `/product/${id}` });
@@ -42,37 +59,22 @@ const ProductDetails = () => {
         seoProps.structuredData = [seoProps.structuredData, bSEO];
     }
 
-    if (!product) {
+    if (loading) {
         return (
             <PageTransition>
-                <SEOHead {...seoProps} />
-                <div style={{ padding: '4rem', textAlign: 'center' }}>Loading...</div>
+                <SEOHead title="Loading Product | Bylot" />
+                <div style={{ padding: '4rem', textAlign: 'center' }}><div className="loader"></div></div>
             </PageTransition>
         );
+    }
+
+    if (error || !product) {
+        return <NotFound />;
     }
 
     const pricing = getProductPricing(product);
     const isAdmin = currentUser?.role === 'admin';
     const isOwner = currentUser && product && currentUser.id == product.seller_id;
-
-    const handleBuyNow = async () => {
-        if (!currentUser) {
-            navigate('/login', { state: { from: `/product/${id}` } });
-            return;
-        }
-        try {
-            await apiRequest('/api/orders', {
-                method: 'POST',
-                body: JSON.stringify({
-                    sellerId: Number(product.seller_id || product.sellerId || 1),
-                    items: [{ productId: Number(id), quantity: 1 }],
-                }),
-            });
-            alert('Purchase recorded successfully!');
-        } catch (err) {
-            alert(err.message || 'Unable to complete purchase');
-        }
-    };
 
     const handleDelete = async () => {
         if (!window.confirm('Are you sure you want to delete this item?')) return;
@@ -173,10 +175,7 @@ const ProductDetails = () => {
                                     <Button variant="primary" style={{ backgroundColor: 'var(--error)', borderColor: 'var(--error)' }} onClick={handleDelete}>Delete Item</Button>
                                 </div>
                             ) : (
-                                <>
-                                    <Button variant="primary" size="lg" className="w-full" onClick={handleBuyNow}>Buy Now</Button>
-                                    <Button variant="outline" size="lg" className="w-full" onClick={() => product.seller_id && navigate(`/seller/${product.seller_id}`)}>Contact Seller</Button>
-                                </>
+                                <Button variant="primary" size="lg" className="w-full" onClick={() => product.seller_id && navigate(`/seller/${product.seller_id}`)}>Contact Seller</Button>
                             )}
                             <Button variant="outline" size="lg" className="w-full" onClick={handleShare}>Share</Button>
                         </div>

@@ -7,6 +7,7 @@ import SEOHead from '../components/SEOHead';
 import { sellerSEO, pageSEO } from '../utils/seo';
 import { apiRequest } from '../api/backendApi';
 import '../styles/SellerDetails.css';
+import NotFound from './NotFound';
 
 const SellerDetails = () => {
     const { id } = useParams();
@@ -50,15 +51,7 @@ const SellerDetails = () => {
     }
 
     if (error || !seller) {
-        return (
-            <PageTransition>
-                <SEOHead {...seoProps} />
-                <div className="container" style={{ padding: '4rem', textAlign: 'center' }}>
-                    <h2>Seller not found</h2>
-                    <Button onClick={() => navigate(-1)}>Go Back</Button>
-                </div>
-            </PageTransition>
-        );
+        return <NotFound />;
     }
 
     return (
