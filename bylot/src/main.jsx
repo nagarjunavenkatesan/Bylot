@@ -26,14 +26,17 @@ class ErrorBoundary extends Component {
   };
   render() {
     if (this.state.hasError) {
+      const isProd = import.meta.env.MODE === 'production';
       return (
         <div style={{ padding: '2rem', fontFamily: 'sans-serif', textAlign: 'center', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main, #f8fafc)', color: 'var(--text-main, #0f172a)' }}>
           <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>🌱</div>
           <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem', fontWeight: '800' }}>Bylot Recovered Gracefully</h1>
-          <p style={{ color: '#64748b', marginBottom: '1.5rem', maxWidth: '500px' }}>An temporary error occurred. You can safely try again or return to the home screen.</p>
-          <pre style={{ background: 'rgba(0,0,0,0.05)', padding: '1rem', borderRadius: '12px', maxWidth: '600px', overflow: 'auto', fontSize: '0.85rem', color: '#ef4444', marginBottom: '1.5rem' }}>
-            {this.state.error?.message || 'Unknown error'}
-          </pre>
+          <p style={{ color: '#64748b', marginBottom: '1.5rem', maxWidth: '500px' }}>A temporary error occurred. You can safely try again or return to the home screen.</p>
+          {!isProd && (
+            <pre style={{ background: 'rgba(0,0,0,0.05)', padding: '1rem', borderRadius: '12px', maxWidth: '600px', overflow: 'auto', fontSize: '0.85rem', color: '#ef4444', marginBottom: '1.5rem' }}>
+              {this.state.error?.message || 'Unknown error'}
+            </pre>
+          )}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button onClick={this.handleReset} style={{ padding: '0.75rem 1.8rem', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '999px', cursor: 'pointer', fontSize: '0.95rem', fontWeight: '700' }}>
               🔄 Try Again

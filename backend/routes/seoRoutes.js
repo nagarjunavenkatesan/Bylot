@@ -39,7 +39,6 @@ const FALLBACK_LOCATION_SLUGS = [
 // ── Master Sitemap Index (/sitemap.xml) ──────────────────────────────────
 router.get("/sitemap.xml", async (req, res) => {
   try {
-    const today = new Date().toISOString().split("T")[0];
     let productPartitions = 1;
 
     try {
@@ -54,22 +53,19 @@ router.get("/sitemap.xml", async (req, res) => {
 
     let productSitemapsXml = "";
     for (let p = 1; p <= productPartitions; p++) {
-      productSitemapsXml += `  <sitemap>\n    <loc>${BASE_URL}/sitemap-products-${p}.xml</loc>\n    <lastmod>${today}</lastmod>\n  </sitemap>\n`;
+      productSitemapsXml += `  <sitemap>\n    <loc>${BASE_URL}/sitemap-products-${p}.xml</loc>\n  </sitemap>\n`;
     }
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
     <loc>${BASE_URL}/sitemap-pages.xml</loc>
-    <lastmod>${today}</lastmod>
   </sitemap>
   <sitemap>
     <loc>${BASE_URL}/sitemap-categories.xml</loc>
-    <lastmod>${today}</lastmod>
   </sitemap>
   <sitemap>
     <loc>${BASE_URL}/sitemap-locations.xml</loc>
-    <lastmod>${today}</lastmod>
   </sitemap>
 ${productSitemapsXml}</sitemapindex>`;
 

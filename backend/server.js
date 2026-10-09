@@ -30,6 +30,30 @@ process.on("unhandledRejection", (reason) => {
   gracefulShutdown(reason instanceof Error ? reason : new Error(String(reason)));
 });
 
+process.on("SIGTERM", () => {
+  console.log("SIGTERM signal received: closing HTTP server");
+  if (serverInstance) {
+    serverInstance.close(() => {
+      console.log("HTTP server closed.");
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT signal received: closing HTTP server");
+  if (serverInstance) {
+    serverInstance.close(() => {
+      console.log("HTTP server closed.");
+      process.exit(0);
+    });
+  } else {
+    process.exit(0);
+  }
+});
+
 async function start() {
   try {
     await pingDatabase();
