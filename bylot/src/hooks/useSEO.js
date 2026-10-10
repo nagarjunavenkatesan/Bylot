@@ -54,6 +54,7 @@ export function useSEO(seoConfig = {}) {
     image,
     type = 'website',
     noindex = false,
+    robots,
     structuredData = null,
   } = seoConfig;
 
@@ -67,7 +68,8 @@ export function useSEO(seoConfig = {}) {
     const staleKeywords = document.head.querySelector('meta[name="keywords"]');
     if (staleKeywords) staleKeywords.remove();
 
-    setMeta('robots', noindex ? 'noindex, nofollow' : 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1');
+    const robotsContent = robots || (noindex ? 'noindex, follow' : 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1');
+    setMeta('robots', robotsContent);
     setMeta('author', SITE.founder);
     setMeta('theme-color', SITE.themeColor);
     setMeta('application-name', SITE.name);
@@ -114,7 +116,7 @@ export function useSEO(seoConfig = {}) {
       if (stalePage) stalePage.remove();
       document.head.querySelectorAll('script[data-seo-id^="page-"]').forEach(el => el.remove());
     }
-  }, [title, description, canonicalUrl, image, type, noindex, structuredData]);
+  }, [title, description, canonicalUrl, image, type, noindex, robots, structuredData]);
 }
 
 export default useSEO;

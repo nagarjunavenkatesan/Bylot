@@ -72,8 +72,8 @@ if (isProduction) {
   if (isKnownDefault(dbPass)) {
     throw new Error("[FATAL] DB_PASSWORD is using an insecure or known default password");
   }
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    throw new Error("[FATAL] SMTP configuration is required in production (SMTP_HOST, SMTP_USER, SMTP_PASS must be set).");
+  if (!process.env.SKIP_SMTP_CHECK && (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS)) {
+    throw new Error("[FATAL] SMTP configuration is required in production (SMTP_HOST, SMTP_USER, SMTP_PASS must be set). Set SKIP_SMTP_CHECK=true in .env if testing or hosting without mail service.");
   }
 }
 

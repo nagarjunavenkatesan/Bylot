@@ -6,7 +6,7 @@ const DEFAULT_BACKEND_URL = '';
 export const API_BASE_URL = (
     import.meta.env.VITE_API_BASE_URL ||
     DEFAULT_BACKEND_URL
-).replace(/\/$/, '');
+).replace(/\/$/, '').replace(/\/api$/, '');
 
 export const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 

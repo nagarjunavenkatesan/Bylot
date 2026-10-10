@@ -430,6 +430,9 @@ module.exports = {
   logout,
   refreshToken,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  issueTokens,
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie
 };
 

@@ -48,7 +48,6 @@ export const AuthProvider = ({ children }) => {
         const token = authData.accessToken || authData.token;
         if (token) {
             setAccessToken(token);
-            localStorage.setItem('accessToken', token);
         }
         const userObj = authData.user || authData;
         setUser(userObj);
@@ -61,7 +60,6 @@ export const AuthProvider = ({ children }) => {
             // ignore network or logout errors
         } finally {
             setAccessToken(null);
-            localStorage.removeItem('accessToken');
             setUser(null);
         }
     };

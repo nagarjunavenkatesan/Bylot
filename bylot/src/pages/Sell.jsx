@@ -35,7 +35,7 @@ const initialForm = {
 
 export default function Sell() {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, login, loading: authLoading } = useAuth();
     const cameraInputRef = useRef(null);
     const galleryInputRef = useRef(null);
 
@@ -48,9 +48,10 @@ export default function Sell() {
     const [showImagePicker, setShowImagePicker] = useState(false);
 
     useEffect(() => {
+        if (authLoading) return;
         if (!user) { navigate('/login', { state: { from: '/sell' } }); return; }
         if (!user.phone) setShowPhoneModal(true);
-    }, [user, navigate]);
+    }, [user, authLoading, navigate]);
 
     const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -86,9 +87,9 @@ export default function Sell() {
             await apiRequest('/api/users/profile', {
                 method: 'POST', body: JSON.stringify({ phone: phoneNumber }),
             });
-            const stored = JSON.parse(localStorage.getItem('user') || '{}');
-            localStorage.setItem('user', JSON.stringify({ ...stored, phone: phoneNumber }));
-            window.dispatchEvent(new Event('storage'));
+            if (user) {
+                login({ ...user, phone: phoneNumber });
+            }
             setShowPhoneModal(false);
         } catch (err) {
             setError(err.message || 'Failed to save phone number');

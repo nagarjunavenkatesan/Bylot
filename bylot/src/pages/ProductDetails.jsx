@@ -7,26 +7,18 @@ import SEOHead from '../components/SEOHead';
 import { productSEO, pageSEO, breadcrumbSEO } from '../utils/seo';
 import '../styles/ProductDetails.css';
 import { getProductPricing } from '../utils/pricing';
+import { useAuth } from '../context/AuthContext';
 import NotFound from './NotFound';
 
 const ProductDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { user: currentUser } = useAuth();
     const [product, setProduct] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
-    const [currentUser, setCurrentUser] = React.useState(null);
 
     React.useEffect(() => {
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-            try {
-                setCurrentUser(JSON.parse(userStr));
-            } catch {
-                localStorage.removeItem('user');
-            }
-        }
-
         let isMounted = true;
         setLoading(true);
         setError(null);

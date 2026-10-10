@@ -22,11 +22,14 @@ export const SITE = {
 
 /**
  * Build a canonical absolute URL.
+ * Strips tracking parameters, query strings, and ensures https://bylot.in.
  * @param {string} path  e.g. '/browse' or '/category/dairy'
  */
 export function canonical(path = '/') {
-  const clean = path.startsWith('/') ? path : `/${path}`;
-  return `${SITE.url}${clean}`;
+  let clean = String(path).split('?')[0].split('#')[0];
+  if (!clean.startsWith('/')) clean = `/${clean}`;
+  const domain = (SITE.url || 'https://bylot.in').replace(/^http:\/\//, 'https://').replace(/\/+$/, '');
+  return `${domain}${clean}`;
 }
 
 /**
@@ -49,6 +52,7 @@ export function pageSEO({
   image,
   type = 'website',
   noindex = false,
+  robots = null,
   structuredData = null,
 } = {}) {
   const fullTitle = title
@@ -61,6 +65,8 @@ export function pageSEO({
     ? (image.startsWith('http') ? image : `${SITE.url}${image.startsWith('/') ? '' : '/'}${image}`)
     : `${SITE.url}${SITE.ogImage}`;
 
+  const robotsDirective = robots || (noindex ? 'noindex, follow' : 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1');
+
   return {
     title: fullTitle,
     description: cleanDescription,
@@ -68,6 +74,7 @@ export function pageSEO({
     image: ogImageUrl,
     type,
     noindex,
+    robots: robotsDirective,
     structuredData,
   };
 }

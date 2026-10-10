@@ -17,17 +17,18 @@ const profileSEO = pageSEO({
 
 const Profile = () => {
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
+    const { user, logout, loading: authLoading } = useAuth();
     const [myItems, setMyItems] = useState([]);
     const [loadingItems, setLoadingItems] = useState(true);
 
     useEffect(() => {
+        if (authLoading) return;
         if (!user) {
             navigate('/login');
             return;
         }
         fetchMyItems();
-    }, [user, navigate]);
+    }, [user, authLoading, navigate]);
 
     const fetchMyItems = async () => {
         try {

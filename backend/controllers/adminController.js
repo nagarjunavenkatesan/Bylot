@@ -6,6 +6,7 @@ const { comparePassword } = require("../utils/password");
 const { signAccessToken, signRefreshToken, hashToken } = require("../utils/token");
 const { getPagination, buildMeta } = require("../utils/pagination");
 const { findUserByEmail, findUserById, saveRefreshToken } = require("../models/userModel");
+const { issueTokens } = require("./authController");
 
 const adminLogin = asyncHandler(async (req, res) => {
   const user = await findUserByEmail(req.body.email);
@@ -14,13 +15,8 @@ const adminLogin = asyncHandler(async (req, res) => {
   }
 
   const publicUser = await findUserById(user.id);
-  const refreshToken = signRefreshToken(publicUser);
-  await saveRefreshToken(user.id, hashToken(refreshToken));
-  return success(res, "Admin login successful", {
-    user: publicUser,
-    accessToken: signAccessToken(publicUser),
-    refreshToken
-  });
+  const data = await issueTokens(publicUser, req, res);
+  return success(res, "Admin login successful", data);
 });
 
 const getAllUsers = asyncHandler(async (req, res) => {

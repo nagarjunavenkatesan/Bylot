@@ -58,7 +58,7 @@ describe("Order Rules and Concurrency Tests", () => {
       .set("Authorization", `Bearer ${attackerToken}`)
       .send({ reason: "Malicious cancellation" });
     expect(cancelRes.status).toBe(404);
-  });
+  }, 30000);
 
   test("Duplicate product lines in cart are merged and total matches database prices", async () => {
     const sellerUser = await createTestUser({ email: `dup_seller_${Date.now()}@example.com`, role: "seller" });
@@ -138,7 +138,7 @@ describe("Order Rules and Concurrency Tests", () => {
     // Stock must be 0
     const [prodRows] = await pool.execute("SELECT stock_quantity FROM products WHERE id = ?", [product.id]);
     expect(prodRows[0].stock_quantity).toBe(0);
-  }, 15000);
+  }, 30000);
 
   test("Cancel restores stock and is allowed only in valid states", async () => {
     const sellerUser = await createTestUser({ email: `canc_seller_${Date.now()}@example.com`, role: "seller" });

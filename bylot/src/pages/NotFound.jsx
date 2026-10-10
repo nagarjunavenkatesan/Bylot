@@ -5,11 +5,13 @@ import SEOHead from '../components/SEOHead';
 import { pageSEO } from '../utils/seo';
 
 const NotFound = () => {
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/404';
     const seoProps = pageSEO({
         title: '404 - Page Not Found | Bylot',
         description: 'The requested page could not be found. Browse discounted groceries, near-expiry deals, and hyperlocal items on Bylot.',
-        path: '/404',
+        path: currentPath,
         noindex: true,
+        robots: 'noindex, nofollow',
     });
 
     return (

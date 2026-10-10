@@ -116,7 +116,7 @@ async function validateAndGetPageSeo(reqPath, query = {}) {
       description: "Secure Bylot user portal.",
       canonical: `${BASE_URL}${cleanPath}`,
       image: DEFAULT_IMAGE,
-      robots: "noindex, nofollow",
+      robots: "noindex, follow",
       jsonLd: null
     };
   }

@@ -32,7 +32,7 @@ const userStatuses    = ['active', 'blocked'];
 function unwrapList(r) { return Array.isArray(r?.data) ? r.data : []; }
 
 async function adminRequest(path, options = {}) {
-    const token = getAccessToken() || localStorage.getItem('accessToken');
+    const token = getAccessToken();
     const response = await fetch(`${API_BASE_URL}${path}`, {
         ...options,
         credentials: 'include',
@@ -136,7 +136,6 @@ const AdminPanel = () => {
             const token = payload?.data?.accessToken || payload?.accessToken;
             if (token) {
                 setAccessToken(token);
-                localStorage.setItem('accessToken', token);
             }
             login({ ...(payload?.data?.user || payload?.user || {}), accessToken: token });
             setPassword('');

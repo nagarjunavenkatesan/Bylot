@@ -44,7 +44,7 @@ function statusLabel(status) {
 }
 
 const SellerOrders = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [page, setPage] = useState(1);
@@ -87,6 +87,7 @@ const SellerOrders = () => {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate('/login', { state: { from: '/seller/orders' } });
       return;
@@ -99,7 +100,7 @@ const SellerOrders = () => {
         setLoading(false);
       }
     })();
-  }, [user, navigate, loadSeller, loadOrders]);
+  }, [user, authLoading, navigate, loadSeller, loadOrders]);
 
   const updateStatus = async (orderId, status) => {
     setUpdatingId(orderId);

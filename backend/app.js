@@ -112,7 +112,7 @@ app.use("/uploads", (req, res, next) => {
 
 // Health check endpoints - /health verifies process and DB health
 // Health check endpoints — returns minimal status without exposing environment or stack traces
-app.get("/health", async (req, res) => {
+app.get(["/health", "/api/health"], async (req, res) => {
   try {
     const connection = await pool.getConnection();
     try {
@@ -134,7 +134,7 @@ app.get("/health", async (req, res) => {
   }
 });
 
-app.get("/health/db", async (req, res) => {
+app.get(["/health/db", "/api/health/db"], async (req, res) => {
   try {
     const connection = await pool.getConnection();
     try {
@@ -199,7 +199,12 @@ app.use("/mcp", mcpRoutes);
 const { validateAndGetPageSeo, renderHtmlWithSeo } = require("./services/seoRenderer");
 
 // Serve built React frontend in production with caching & SSR route validation
-const frontendDist = path.resolve(__dirname, "..", "bylot", "dist");
+const candidateDistPaths = [
+  process.env.FRONTEND_DIST,
+  path.resolve(__dirname, "..", "bylot", "dist"),
+  path.resolve("/bylot/dist")
+].filter(Boolean);
+const frontendDist = candidateDistPaths.find(p => fs.existsSync(p)) || candidateDistPaths[0] || path.resolve(__dirname, "..", "bylot", "dist");
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist, {
     maxAge: "1d",

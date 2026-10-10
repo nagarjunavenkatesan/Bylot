@@ -47,8 +47,18 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-358858464400-6di0qk18deq2fejn7g3f830i2g5fr1nf.apps.googleusercontent.com}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       APP_URL: ${APP_URL:-https://bylot.in}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Bylot <no-reply@bylot.in>}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
+      SKIP_SMTP_CHECK: ${SKIP_SMTP_CHECK:-false}
     volumes:
       - uploads_data:/app/uploads
+      - frontend_dist:/bylot/dist:ro
     networks:
       - bylot-network
     # Bound to localhost only if direct backend inspection is needed; otherwise reached via frontend reverse proxy
@@ -70,6 +80,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    volumes:
+      - frontend_dist:/usr/share/nginx/html
     # Bound to 127.0.0.1:8080 to prevent collision with host Nginx on ports 80/443
     ports:
       - "127.0.0.1:8080:80"
@@ -80,6 +92,8 @@ volumes:
   mysql_data:
     driver: local
   uploads_data:
+    driver: local
+  frontend_dist:
     driver: local
 
 networks:

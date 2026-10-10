@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Card from './Card';
 import { FaTrash, FaEdit, FaFlag } from 'react-icons/fa';
-import { apiRequest } from '../api/backendApi';
+import { apiRequest, getAccessToken } from '../api/backendApi';
 import { getProductPricing } from '../utils/pricing';
 
 const REPORT_REASONS = [
@@ -28,7 +28,7 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
         e.preventDefault();
         e.stopPropagation();
 
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (!token) {
             alert('Please log in to report a product.');
             return;

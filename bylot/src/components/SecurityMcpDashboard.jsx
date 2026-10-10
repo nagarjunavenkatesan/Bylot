@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FaShieldAlt, FaServer, FaLock, FaCheckCircle, FaExclamationTriangle, FaTerminal, FaSync, FaBan } from 'react-icons/fa';
-import { API_BASE_URL } from '../api/backendApi';
+import { API_BASE_URL, getAccessToken } from '../api/backendApi';
 
 const SecurityMcpDashboard = () => {
     const [securityData, setSecurityData] = useState(null);
@@ -13,11 +13,11 @@ const SecurityMcpDashboard = () => {
     const fetchSecurityStatus = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('accessToken');
+            const token = getAccessToken();
             const res = await fetch(`${API_BASE_URL}/api/security/status`, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                 }
             });
             const data = await res.json();
@@ -47,12 +47,12 @@ const SecurityMcpDashboard = () => {
         setMcpLoading(true);
         setActiveMcpTool(toolName);
         try {
-            const token = localStorage.getItem('accessToken');
+            const token = getAccessToken();
             const res = await fetch(`${API_BASE_URL}/mcp/tools/${toolName}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify({})
             });
