@@ -96,7 +96,7 @@ if (isProduction) {
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 5000),
-  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS || 2),
+  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS !== undefined ? process.env.TRUST_PROXY_HOPS : 1),
   cookieSameSite: (process.env.COOKIE_SAMESITE || "strict").toLowerCase(),
   cookieDomain: process.env.COOKIE_DOMAIN || undefined,
   apiBaseUrl: process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`,

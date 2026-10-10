@@ -14,6 +14,11 @@ android {
         debug {
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5000/api/\"")
         }
+        release {
+            buildConfigField("String", "API_BASE_URL", "\"https://bylot.in/api/\"")
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
     namespace = "com.bylot.android"
     compileSdk = 35

@@ -83,11 +83,24 @@ async function issueTokens(user, req, res, existingFamilyId = null) {
 
   setRefreshTokenCookie(res, refreshToken);
 
-  return {
+  const isWebBrowser = Boolean(
+    req.headers["sec-fetch-dest"] ||
+    req.headers["sec-fetch-mode"] ||
+    (req.headers.origin && !req.headers["x-client-platform"])
+  );
+
+  const responsePayload = {
     user,
-    accessToken,
-    refreshToken
+    accessToken
   };
+
+  // Mobile clients (Android/iOS) or programmatic API clients receive refreshToken in JSON
+  // Web browser clients rely strictly on HttpOnly Secure cookies
+  if (!isWebBrowser || req.headers["x-client-platform"] === "android" || req.headers["x-client-platform"] === "ios") {
+    responsePayload.refreshToken = refreshToken;
+  }
+
+  return responsePayload;
 }
 
 const register = asyncHandler(async (req, res) => {

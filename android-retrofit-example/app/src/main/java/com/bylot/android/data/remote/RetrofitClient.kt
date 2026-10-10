@@ -12,9 +12,11 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
+import com.bylot.android.BuildConfig
+
 object RetrofitClient {
-    // Production default: https://bylot.in/api/
-    const val BASE_URL = "https://bylot.in/api/"
+    // Production default: https://bylot.in/api/ (or debug URL from BuildConfig in debug variants)
+    val BASE_URL: String = BuildConfig.API_BASE_URL
     // Pass API key via environment / secure configuration rather than hardcoding
     private val API_KEY: String get() = System.getProperty("BYLOT_API_KEY") ?: ""
 
@@ -33,6 +35,7 @@ object RetrofitClient {
                 val request = chain.request()
                     .newBuilder()
                     .addHeader("x-api-key", API_KEY)
+                    .addHeader("x-client-platform", "android")
                     .build()
                 chain.proceed(request)
             }

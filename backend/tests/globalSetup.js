@@ -18,10 +18,16 @@ module.exports = async function globalSetup() {
     process.exit(1);
   }
 
+  require("dotenv").config({ path: path.join(__dirname, "../.env") });
   const host = process.env.DB_HOST || "localhost";
   const user = process.env.DB_USER || "root";
-  const password = process.env.DB_PASSWORD || "4014";
+  const password = process.env.DB_PASSWORD;
   const port = Number(process.env.DB_PORT || 3306);
+
+  if (!password) {
+    console.error("[TEST GUARD FATAL] DB_PASSWORD environment variable is required to run the test suite. Please set DB_PASSWORD in environment or backend/.env.");
+    process.exit(1);
+  }
 
   try {
     const rootConn = await mysql.createConnection({

@@ -6,8 +6,14 @@ if (process.env.NODE_ENV === "production") {
   process.exit(1);
 }
 
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
+
 process.env.NODE_ENV = "test";
-process.env.DB_PASSWORD = process.env.DB_PASSWORD || "4014";
+if (!process.env.DB_PASSWORD) {
+  console.error("\n[TEST ERROR] DB_PASSWORD environment variable is required for tests. Aborting.");
+  process.exit(1);
+}
 process.env.DB_NAME = process.env.DB_NAME || "bylot_test";
 
 if (!process.env.DB_NAME.endsWith("_test")) {

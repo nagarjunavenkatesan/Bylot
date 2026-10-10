@@ -39,17 +39,11 @@ const FALLBACK_LOCATION_SLUGS = [
 // ── Master Sitemap Index (/sitemap.xml) ──────────────────────────────────
 router.get("/sitemap.xml", async (req, res) => {
   try {
-    let productPartitions = 1;
-
-    try {
-      const [countRows] = await pool.query(
-        "SELECT COUNT(*) AS total FROM products WHERE status IN ('active', 'available') AND (expiry_date IS NULL OR expiry_date >= CURDATE())"
-      );
-      const totalProducts = countRows[0]?.total || 0;
-      productPartitions = Math.max(1, Math.ceil(totalProducts / ITEMS_PER_PRODUCT_SITEMAP));
-    } catch {
-      productPartitions = 1;
-    }
+    const [countRows] = await pool.query(
+      "SELECT COUNT(*) AS total FROM products WHERE status IN ('active', 'available') AND (expiry_date IS NULL OR expiry_date >= CURDATE())"
+    );
+    const totalProducts = countRows[0]?.total || 0;
+    const productPartitions = Math.max(1, Math.ceil(totalProducts / ITEMS_PER_PRODUCT_SITEMAP));
 
     let productSitemapsXml = "";
     for (let p = 1; p <= productPartitions; p++) {
@@ -72,8 +66,9 @@ ${productSitemapsXml}</sitemapindex>`;
     res.header("Content-Type", "application/xml");
     res.header("Cache-Control", "public, max-age=3600");
     res.send(xml);
-  } catch {
-    res.status(500).send("Error generating sitemap index");
+  } catch (err) {
+    console.error("Sitemap index generation failed:", err.message);
+    res.status(500).header("Content-Type", "application/xml").send('<?xml version="1.0" encoding="UTF-8"?><error>Error generating sitemap index</error>');
   }
 });
 
@@ -91,25 +86,26 @@ router.get("/sitemap-pages.xml", (req, res) => {
 
 // ── Categories Sitemap (/sitemap-categories.xml) ─────────────────────────
 router.get("/sitemap-categories.xml", async (req, res) => {
-  let categoryEntries = FALLBACK_CATEGORY_SLUGS.map(s => ({ slug: s, updated_at: null }));
   try {
+    let categoryEntries = FALLBACK_CATEGORY_SLUGS.map(s => ({ slug: s, updated_at: null }));
     const [rows] = await pool.query("SELECT slug, updated_at FROM categories WHERE is_active = 1 ORDER BY id ASC");
     if (rows && rows.length > 0) {
       categoryEntries = rows;
     }
-  } catch {
-    // Fallback if DB fails
+
+    const urls = categoryEntries.map((cat) => {
+      const lastmodTag = cat.updated_at ? `\n    <lastmod>${new Date(cat.updated_at).toISOString().split("T")[0]}</lastmod>` : "";
+      return `  <url>\n    <loc>${BASE_URL}/category/${cat.slug}</loc>${lastmodTag}\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>`;
+    }).join("\n");
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`;
+    res.header("Content-Type", "application/xml");
+    res.header("Cache-Control", "public, max-age=86400");
+    res.send(xml);
+  } catch (err) {
+    console.error("Categories sitemap generation failed:", err.message);
+    res.status(500).header("Content-Type", "application/xml").send('<?xml version="1.0" encoding="UTF-8"?><error>Error generating categories sitemap</error>');
   }
-
-  const urls = categoryEntries.map((cat) => {
-    const lastmodTag = cat.updated_at ? `\n    <lastmod>${new Date(cat.updated_at).toISOString().split("T")[0]}</lastmod>` : "";
-    return `  <url>\n    <loc>${BASE_URL}/category/${cat.slug}</loc>${lastmodTag}\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>`;
-  }).join("\n");
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`;
-  res.header("Content-Type", "application/xml");
-  res.header("Cache-Control", "public, max-age=86400");
-  res.send(xml);
 });
 
 // ── Locations Sitemap (/sitemap-locations.xml) ──────────────────────────
@@ -136,15 +132,10 @@ router.get("/sitemap-products-:partition.xml", async (req, res) => {
       return res.status(404).header("Content-Type", "application/xml").send('<?xml version="1.0" encoding="UTF-8"?><error>Sitemap partition not found</error>');
     }
 
-    let totalProducts = 0;
-    try {
-      const [countRows] = await pool.query(
-        "SELECT COUNT(*) AS total FROM products WHERE status IN ('active', 'available') AND (expiry_date IS NULL OR expiry_date >= CURDATE())"
-      );
-      totalProducts = countRows[0]?.total || 0;
-    } catch {
-      totalProducts = 0;
-    }
+    const [countRows] = await pool.query(
+      "SELECT COUNT(*) AS total FROM products WHERE status IN ('active', 'available') AND (expiry_date IS NULL OR expiry_date >= CURDATE())"
+    );
+    const totalProducts = countRows[0]?.total || 0;
 
     const totalPartitions = Math.max(1, Math.ceil(totalProducts / ITEMS_PER_PRODUCT_SITEMAP));
     if (partition > totalPartitions) {
@@ -152,33 +143,28 @@ router.get("/sitemap-products-:partition.xml", async (req, res) => {
     }
 
     const offset = (partition - 1) * ITEMS_PER_PRODUCT_SITEMAP;
-    let productUrls = [];
-
-    try {
-      const [rows] = await pool.query(
-        `SELECT id, updated_at, created_at
-         FROM products
-         WHERE status IN ('active', 'available')
-           AND (expiry_date IS NULL OR expiry_date >= CURDATE())
-         ORDER BY id ASC
-         LIMIT ? OFFSET ?`,
-        [ITEMS_PER_PRODUCT_SITEMAP, offset]
-      );
-      productUrls = (rows || []).map((row) => {
-        const date = row.updated_at || row.created_at;
-        const lastmodTag = date ? `\n    <lastmod>${new Date(date).toISOString().split("T")[0]}</lastmod>` : "";
-        return `  <url>\n    <loc>${BASE_URL}/product/${row.id}</loc>${lastmodTag}\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`;
-      });
-    } catch (err) {
-      console.warn("Product sitemap partition error:", err.message);
-    }
+    const [rows] = await pool.query(
+      `SELECT id, updated_at, created_at
+       FROM products
+       WHERE status IN ('active', 'available')
+         AND (expiry_date IS NULL OR expiry_date >= CURDATE())
+       ORDER BY id ASC
+       LIMIT ? OFFSET ?`,
+      [ITEMS_PER_PRODUCT_SITEMAP, offset]
+    );
+    const productUrls = (rows || []).map((row) => {
+      const date = row.updated_at || row.created_at;
+      const lastmodTag = date ? `\n    <lastmod>${new Date(date).toISOString().split("T")[0]}</lastmod>` : "";
+      return `  <url>\n    <loc>${BASE_URL}/product/${row.id}</loc>${lastmodTag}\n    <changefreq>daily</changefreq>\n    <priority>0.7</priority>\n  </url>`;
+    });
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${productUrls.join("\n")}\n</urlset>`;
     res.header("Content-Type", "application/xml");
     res.header("Cache-Control", "public, max-age=3600");
     res.send(xml);
-  } catch {
-    res.status(500).send("Error generating product sitemap partition");
+  } catch (err) {
+    console.error("Product sitemap partition error:", err.message);
+    res.status(500).header("Content-Type", "application/xml").send('<?xml version="1.0" encoding="UTF-8"?><error>Error generating product sitemap partition</error>');
   }
 });
 

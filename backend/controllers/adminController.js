@@ -3,9 +3,8 @@ const { success } = require("../utils/apiResponse");
 const AppError = require("../utils/AppError");
 const asyncHandler = require("../utils/asyncHandler");
 const { comparePassword } = require("../utils/password");
-const { signAccessToken, signRefreshToken, hashToken } = require("../utils/token");
 const { getPagination, buildMeta } = require("../utils/pagination");
-const { findUserByEmail, findUserById, saveRefreshToken } = require("../models/userModel");
+const { findUserByEmail, findUserById } = require("../models/userModel");
 const { issueTokens } = require("./authController");
 
 const adminLogin = asyncHandler(async (req, res) => {
