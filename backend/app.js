@@ -31,12 +31,16 @@ const cookieParser = require("cookie-parser");
 const app = express();
 
 app.disable("x-powered-by");
-// Trust proxy configured for 2 hops (outer nginx + container frontend nginx)
-const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS || 2);
-app.set("trust proxy", trustProxyHops);
+// Trust proxy configured centrally via env.trustProxyHops
+app.set("trust proxy", env.trustProxyHops);
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: {
+    maxAge: 63072000,
+    includeSubDomains: true,
+    preload: true
+  },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],

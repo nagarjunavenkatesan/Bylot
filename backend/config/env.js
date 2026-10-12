@@ -27,7 +27,12 @@ const KNOWN_DEFAULTS = [
   "replace_with_a_long_random_refresh_secret",
   "replace_with_a_long_random_jwt_secret",
   "bylot_secure_pass_4014",
-  "bylot_root_secret_4014"
+  "bylot_root_secret_4014",
+  "@bvnd4014bv",
+  "bvnd",
+  "bvnd4014",
+  "4014",
+  "adminpass123!"
 ];
 
 function isKnownDefault(val) {
@@ -59,6 +64,7 @@ if (isProduction) {
   const accessSec = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "";
   const refreshSec = process.env.JWT_REFRESH_SECRET || "";
   const dbPass = process.env.DB_PASSWORD || "";
+  const encKey = process.env.ENCRYPTION_KEY || "";
 
   if (accessSec.length < 32 || isKnownDefault(accessSec)) {
     throw new Error("[FATAL] JWT_SECRET must be at least 32 characters and not a known default");
@@ -71,6 +77,9 @@ if (isProduction) {
   }
   if (isKnownDefault(dbPass)) {
     throw new Error("[FATAL] DB_PASSWORD is using an insecure or known default password");
+  }
+  if (!encKey || encKey.length < 32 || isKnownDefault(encKey)) {
+    throw new Error("[FATAL] ENCRYPTION_KEY is required in production, must be at least 32 characters, and not a known default");
   }
   if (!process.env.SKIP_SMTP_CHECK && (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS)) {
     throw new Error("[FATAL] SMTP configuration is required in production (SMTP_HOST, SMTP_USER, SMTP_PASS must be set). Set SKIP_SMTP_CHECK=true in .env if testing or hosting without mail service.");
@@ -96,7 +105,7 @@ if (isProduction) {
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 5000),
-  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS !== undefined ? process.env.TRUST_PROXY_HOPS : 1),
+  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS !== undefined ? process.env.TRUST_PROXY_HOPS : 2),
   cookieSameSite: (process.env.COOKIE_SAMESITE || "strict").toLowerCase(),
   cookieDomain: process.env.COOKIE_DOMAIN || undefined,
   apiBaseUrl: process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`,

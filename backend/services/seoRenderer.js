@@ -125,9 +125,10 @@ async function validateAndGetPageSeo(reqPath, query = {}) {
   const productMatch = cleanPath.match(/^\/product\/([^/]+)$/);
   if (productMatch) {
     const rawId = productMatch[1];
+    let rows;
     try {
       const isNum = /^\d+$/.test(rawId);
-      const [rows] = await pool.query(
+      [rows] = await pool.query(
         `SELECT p.id, p.product_item_id, p.name, p.description, p.mrp, p.selling_price, p.stock_quantity,
                 p.expiry_date, p.status, p.image_url, s.business_name AS seller_name, c.name AS category_name
          FROM products p
@@ -137,118 +138,118 @@ async function validateAndGetPageSeo(reqPath, query = {}) {
          LIMIT 1`,
         isNum ? [Number(rawId), rawId] : [rawId]
       );
-
-      const product = rows[0];
-
-      if (!product) {
-        return {
-          status: 404,
-          title: "Product Not Found | Bylot",
-          description: "The requested product does not exist or has been removed from Bylot.",
-          canonical: `${BASE_URL}${cleanPath}`,
-          image: DEFAULT_IMAGE,
-          robots: "noindex, nofollow",
-          jsonLd: null
-        };
-      }
-
-      if (product.status === "deleted") {
-        return {
-          status: 404,
-          title: "Product No Longer Available | Bylot",
-          description: "This product listing was removed or deleted by the seller.",
-          canonical: `${BASE_URL}${cleanPath}`,
-          image: DEFAULT_IMAGE,
-          robots: "noindex, nofollow",
-          jsonLd: null
-        };
-      }
-
-      if (product.status === "blocked" || product.status === "inactive" || product.status === "draft") {
-        return {
-          status: 404,
-          title: "Product Unavailable | Bylot",
-          description: "This product listing is currently inactive or unavailable.",
-          canonical: `${BASE_URL}${cleanPath}`,
-          image: DEFAULT_IMAGE,
-          robots: "noindex, nofollow",
-          jsonLd: null
-        };
-      }
-
-      const price = Number(product.selling_price || 0);
-      const mrp = Number(product.mrp || 0);
-      const isExpired = product.expiry_date && new Date(product.expiry_date) < new Date();
-      const isAvailable = (product.status === "active" || product.status === "available") && !isExpired;
-
-      const title = `${product.name} – ₹${price} | Bylot`;
-      const description = `Buy ${product.name} at ₹${price}${mrp ? ` (MRP ₹${mrp})` : ""} on Bylot. ${product.description ? product.description.slice(0, 140) : "Fresh surplus and near-expiry deals verified on Bylot."}`;
-      const image = product.image_url ? (product.image_url.startsWith("http") ? product.image_url : `${BASE_URL}${product.image_url}`) : DEFAULT_IMAGE;
-      const canonicalUrl = `${BASE_URL}/product/${product.id}`;
-
-      const offerObj = {
-        "@type": "Offer",
-        url: canonicalUrl,
-        priceCurrency: "INR",
-        price: String(price),
-        availability: product.stock_quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-        seller: {
-          "@type": "LocalBusiness",
-          name: product.seller_name || "Verified Bylot Seller"
-        }
-      };
-
-      if (product.expiry_date) {
-        offerObj.priceValidUntil = new Date(product.expiry_date).toISOString().split("T")[0];
-      }
-
-      const jsonLd = {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        name: product.name,
-        description: product.description || description,
-        image,
-        sku: String(product.product_item_id || product.id),
-        offers: offerObj
-      };
-
-      if (product.seller_name) {
-        jsonLd.brand = {
-          "@type": "Brand",
-          name: product.seller_name
-        };
-      }
-
-      return {
-        status: 200,
-        title,
-        description,
-        canonical: canonicalUrl,
-        image,
-        robots: isAvailable
-          ? "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"
-          : "noindex, follow",
-        jsonLd
-      };
     } catch (err) {
-      console.warn("[SEO] Product lookup error:", err.message);
+      console.warn("[SEO] Product DB lookup failure:", err.message);
       return {
-        status: 404,
-        title: "Product Not Found | Bylot",
-        description: "The requested product does not exist.",
+        status: 503,
+        title: "Service Temporarily Unavailable | Bylot",
+        description: "Database service is temporarily unavailable. Please try again shortly.",
         canonical: `${BASE_URL}${cleanPath}`,
         image: DEFAULT_IMAGE,
         robots: "noindex, nofollow",
         jsonLd: null
       };
     }
+
+    const product = rows[0];
+
+    if (!product) {
+      return {
+        status: 404,
+        title: "Product Not Found | Bylot",
+        description: "The requested product does not exist or has been removed from Bylot.",
+        canonical: `${BASE_URL}${cleanPath}`,
+        image: DEFAULT_IMAGE,
+        robots: "noindex, nofollow",
+        jsonLd: null
+      };
+    }
+
+    if (product.status === "deleted") {
+      return {
+        status: 404,
+        title: "Product No Longer Available | Bylot",
+        description: "This product listing was removed or deleted by the seller.",
+        canonical: `${BASE_URL}${cleanPath}`,
+        image: DEFAULT_IMAGE,
+        robots: "noindex, nofollow",
+        jsonLd: null
+      };
+    }
+
+    if (product.status === "blocked" || product.status === "inactive" || product.status === "draft") {
+      return {
+        status: 404,
+        title: "Product Unavailable | Bylot",
+        description: "This product listing is currently inactive or unavailable.",
+        canonical: `${BASE_URL}${cleanPath}`,
+        image: DEFAULT_IMAGE,
+        robots: "noindex, nofollow",
+        jsonLd: null
+      };
+    }
+
+    const price = Number(product.selling_price || 0);
+    const mrp = Number(product.mrp || 0);
+    const isExpired = product.expiry_date && new Date(product.expiry_date) < new Date();
+    const isAvailable = (product.status === "active" || product.status === "available") && !isExpired;
+
+    const title = `${product.name} – ₹${price} | Bylot`;
+    const description = `Buy ${product.name} at ₹${price}${mrp ? ` (MRP ₹${mrp})` : ""} on Bylot. ${product.description ? product.description.slice(0, 140) : "Fresh surplus and near-expiry deals verified on Bylot."}`;
+    const image = product.image_url ? (product.image_url.startsWith("http") ? product.image_url : `${BASE_URL}${product.image_url}`) : DEFAULT_IMAGE;
+    const canonicalUrl = `${BASE_URL}/product/${product.id}`;
+
+    const offerObj = {
+      "@type": "Offer",
+      url: canonicalUrl,
+      priceCurrency: "INR",
+      price: String(price),
+      availability: product.stock_quantity > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      seller: {
+        "@type": "LocalBusiness",
+        name: product.seller_name || "Verified Bylot Seller"
+      }
+    };
+
+    if (product.expiry_date) {
+      offerObj.priceValidUntil = new Date(product.expiry_date).toISOString().split("T")[0];
+    }
+
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: product.name,
+      description: product.description || description,
+      image,
+      sku: String(product.product_item_id || product.id),
+      offers: offerObj
+    };
+
+    if (product.seller_name) {
+      jsonLd.brand = {
+        "@type": "Brand",
+        name: product.seller_name
+      };
+    }
+
+    return {
+      status: 200,
+      title,
+      description,
+      canonical: canonicalUrl,
+      image,
+      robots: isAvailable
+        ? "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"
+        : "noindex, follow",
+      jsonLd
+    };
   }
 
   // 6. Category Page: /category/:slug
   const categoryMatch = cleanPath.match(/^\/category\/([^/]+)$/);
   if (categoryMatch) {
     const slug = categoryMatch[1];
-    let cat = null;
+    let cat;
     try {
       const [rows] = await pool.query(
         "SELECT id, name, slug, description FROM categories WHERE slug = ? AND is_active = 1 LIMIT 1",
@@ -256,7 +257,16 @@ async function validateAndGetPageSeo(reqPath, query = {}) {
       );
       cat = rows[0];
     } catch (err) {
-      console.warn("[SEO] Category lookup error:", err.message);
+      console.warn("[SEO] Category DB lookup failure:", err.message);
+      return {
+        status: 503,
+        title: "Service Temporarily Unavailable | Bylot",
+        description: "Database service is temporarily unavailable. Please try again shortly.",
+        canonical: `${BASE_URL}${cleanPath}`,
+        image: DEFAULT_IMAGE,
+        robots: "noindex, nofollow",
+        jsonLd: null
+      };
     }
 
     if (!cat && FALLBACK_CATEGORY_SLUGS.includes(slug)) {
@@ -275,9 +285,9 @@ async function validateAndGetPageSeo(reqPath, query = {}) {
       };
     }
 
-      const title = `${cat.name} Deals & Near-Expiry Items | Save Up to 70% | Bylot`;
-      const description = `Find discounted ${cat.name.toLowerCase()}, surplus stock, and near-expiry essentials from local stores on Bylot.`;
-      const canonicalUrl = `${BASE_URL}/category/${cat.slug}`;
+    const title = `${cat.name} Deals & Near-Expiry Items | Save Up to 70% | Bylot`;
+    const description = `Find discounted ${cat.name.toLowerCase()}, surplus stock, and near-expiry essentials from local stores on Bylot.`;
+    const canonicalUrl = `${BASE_URL}/category/${cat.slug}`;
 
       return {
         status: 200,
@@ -366,52 +376,62 @@ async function validateAndGetPageSeo(reqPath, query = {}) {
   if (sellerMatch) {
     const rawId = sellerMatch[1];
     if (/^\d+$/.test(rawId)) {
+      let seller;
       try {
         const [rows] = await pool.query(
           "SELECT id, business_name, city, approval_status, status FROM sellers WHERE id = ? AND approval_status = 'approved' AND status = 'active' LIMIT 1",
           [Number(rawId)]
         );
-        const seller = rows[0];
-
-        if (!seller) {
-          return {
-            status: 404,
-            title: "Seller Profile Not Found | Bylot",
-            description: "The requested seller storefront does not exist or is currently inactive.",
-            canonical: `${BASE_URL}${cleanPath}`,
-            image: DEFAULT_IMAGE,
-            robots: "noindex, nofollow",
-            jsonLd: null
-          };
-        }
-
-        const title = `${seller.business_name} – Store Deals & Near-Expiry Goods in ${seller.city || "India"} | Bylot`;
-        const description = `Shop near-expiry products, fresh produce, and discounted groceries directly from ${seller.business_name} in ${seller.city || "India"} on Bylot.`;
-        const canonicalUrl = `${BASE_URL}/seller/${seller.id}`;
-
-        return {
-          status: 200,
-          title,
-          description,
-          canonical: canonicalUrl,
-          image: DEFAULT_IMAGE,
-          robots: "index, follow",
-          jsonLd: {
-            "@context": "https://schema.org",
-            "@type": "LocalBusiness",
-            name: seller.business_name,
-            description,
-            url: canonicalUrl,
-            address: {
-              "@type": "PostalAddress",
-              addressLocality: seller.city || "India",
-              addressCountry: "IN"
-            }
-          }
-        };
+        seller = rows[0];
       } catch (err) {
-        console.warn("[SEO] Seller lookup error:", err.message);
+        console.warn("[SEO] Seller DB lookup failure:", err.message);
+        return {
+          status: 503,
+          title: "Service Temporarily Unavailable | Bylot",
+          description: "Database service is temporarily unavailable. Please try again shortly.",
+          canonical: `${BASE_URL}${cleanPath}`,
+          image: DEFAULT_IMAGE,
+          robots: "noindex, nofollow",
+          jsonLd: null
+        };
       }
+
+      if (!seller) {
+        return {
+          status: 404,
+          title: "Seller Profile Not Found | Bylot",
+          description: "The requested seller storefront does not exist or is currently inactive.",
+          canonical: `${BASE_URL}${cleanPath}`,
+          image: DEFAULT_IMAGE,
+          robots: "noindex, nofollow",
+          jsonLd: null
+        };
+      }
+
+      const title = `${seller.business_name} – Store Deals & Near-Expiry Goods in ${seller.city || "India"} | Bylot`;
+      const description = `Shop near-expiry products, fresh produce, and discounted groceries directly from ${seller.business_name} in ${seller.city || "India"} on Bylot.`;
+      const canonicalUrl = `${BASE_URL}/seller/${seller.id}`;
+
+      return {
+        status: 200,
+        title,
+        description,
+        canonical: canonicalUrl,
+        image: DEFAULT_IMAGE,
+        robots: "index, follow",
+        jsonLd: {
+          "@context": "https://schema.org",
+          "@type": "LocalBusiness",
+          name: seller.business_name,
+          description,
+          url: canonicalUrl,
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: seller.city || "India",
+            addressCountry: "IN"
+          }
+        }
+      };
     }
 
     return {

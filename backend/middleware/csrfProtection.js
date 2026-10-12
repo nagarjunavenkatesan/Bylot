@@ -2,6 +2,11 @@ const AppError = require("../utils/AppError");
 const env = require("../config/env");
 
 function cookieCsrfProtection(req, res, next) {
+  // Mobile clients (Android / iOS) do not use ambient browser cookies and authenticate via explicit tokens
+  if (req.headers["x-client-platform"] === "android" || req.headers["x-client-platform"] === "ios") {
+    return next();
+  }
+
   // 1. Require custom header X-Requested-With: bylot
   const reqWith = req.headers["x-requested-with"];
   if (!reqWith || reqWith.toLowerCase() !== "bylot") {

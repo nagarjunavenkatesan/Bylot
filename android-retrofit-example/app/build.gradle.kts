@@ -16,7 +16,7 @@ android {
         }
         release {
             buildConfigField("String", "API_BASE_URL", "\"https://bylot.in/api/\"")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

@@ -35,6 +35,21 @@ async function main() {
     throw new Error("Admin password must be at least 10 characters long.");
   }
 
+  const BANNED_ADMIN_PASSWORDS = [
+    "admin",
+    "password",
+    "12345678",
+    "adminpass",
+    "adminpass123",
+    "4014",
+    "bvnd",
+    "@bvnd4014bv",
+    "bvnd4014"
+  ];
+  if (BANNED_ADMIN_PASSWORDS.some(p => password.toLowerCase().includes(p))) {
+    throw new Error("[SECURITY] Insecure or known default admin password rejected. Choose a strong, unique passphrase.");
+  }
+
   const passwordHash = await hashPassword(password);
   const [existing] = await pool.execute("SELECT id FROM users WHERE email = ? LIMIT 1", [email]);
 

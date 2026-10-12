@@ -2,15 +2,28 @@ package com.bylot.android.data.model
 
 import com.google.gson.annotations.SerializedName
 
+data class ApiResponse<T>(
+    @SerializedName("success")
+    val success: Boolean,
+    @SerializedName("message")
+    val message: String? = null,
+    @SerializedName("data")
+    val data: T? = null
+)
+
 data class ProductDto(
     @SerializedName("id")
     val id: Long,
     @SerializedName("name")
     val name: String,
+    @SerializedName("selling_price")
+    val sellingPrice: Double? = null,
     @SerializedName("price")
-    val price: Double,
+    val rawPrice: Double? = null,
+    @SerializedName("image_url")
+    val imageUrl: String? = null,
     @SerializedName("image")
-    val image: String?
+    val rawImage: String? = null
 )
 
 data class Product(
@@ -21,16 +34,17 @@ data class Product(
 )
 
 fun ProductDto.toDomain(baseUrl: String): Product {
+    val raw = imageUrl ?: rawImage
     val normalizedImageUrl = when {
-        image.isNullOrBlank() -> null
-        image.startsWith("http://") || image.startsWith("https://") -> image
-        else -> baseUrl.trimEnd('/') + "/" + image.trimStart('/')
+        raw.isNullOrBlank() -> null
+        raw.startsWith("http://") || raw.startsWith("https://") -> raw
+        else -> baseUrl.trimEnd('/') + "/" + raw.trimStart('/')
     }
 
     return Product(
         id = id,
         name = name,
-        price = price,
+        price = sellingPrice ?: rawPrice ?: 0.0,
         imageUrl = normalizedImageUrl
     )
 }

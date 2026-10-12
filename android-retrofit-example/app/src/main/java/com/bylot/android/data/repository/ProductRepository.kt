@@ -21,7 +21,7 @@ class ProductRepository(
             val response = apiService.getProducts()
 
             if (response.isSuccessful) {
-                val products = response.body()
+                val products = response.body()?.data
                     ?.map { it.toDomain(RetrofitClient.BASE_URL) }
                     .orEmpty()
 

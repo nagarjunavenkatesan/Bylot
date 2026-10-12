@@ -22,7 +22,7 @@ object RetrofitClient {
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
         }
     }
 
@@ -36,6 +36,7 @@ object RetrofitClient {
                     .newBuilder()
                     .addHeader("x-api-key", API_KEY)
                     .addHeader("x-client-platform", "android")
+                    .addHeader("X-Requested-With", "bylot")
                     .build()
                 chain.proceed(request)
             }

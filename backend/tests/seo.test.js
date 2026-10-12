@@ -105,5 +105,47 @@ describe("SEO & SPA 404 Route Handling Integration Tests", () => {
       expect(res.status).toBe(200);
       expect(res.text).toContain("Bengaluru");
     });
+
+    it("should return HTTP 503 rather than 404 when database fails during product SEO lookup", async () => {
+      const { pool } = require("../config/db");
+      const originalQuery = pool.query;
+      pool.query = jest.fn().mockRejectedValueOnce(new Error("ECONNREFUSED: Database connection lost"));
+      try {
+        const res = await request(app).get("/product/12345");
+        expect(res.status).toBe(503);
+        expect(res.text).toContain("Service Temporarily Unavailable | Bylot");
+        expect(res.text).toContain('name="robots" content="noindex, nofollow"');
+      } finally {
+        pool.query = originalQuery;
+      }
+    });
+
+    it("should return HTTP 503 rather than 404 when database fails during category SEO lookup", async () => {
+      const { pool } = require("../config/db");
+      const originalQuery = pool.query;
+      pool.query = jest.fn().mockRejectedValueOnce(new Error("ETIMEDOUT: DB query timed out"));
+      try {
+        const res = await request(app).get("/category/groceries");
+        expect(res.status).toBe(503);
+        expect(res.text).toContain("Service Temporarily Unavailable | Bylot");
+        expect(res.text).toContain('name="robots" content="noindex, nofollow"');
+      } finally {
+        pool.query = originalQuery;
+      }
+    });
+
+    it("should return HTTP 404 for deleted product", async () => {
+      const { pool } = require("../config/db");
+      const originalQuery = pool.query;
+      pool.query = jest.fn().mockResolvedValueOnce([[{ id: 999, name: "Old Item", status: "deleted" }]]);
+      try {
+        const res = await request(app).get("/product/999");
+        expect(res.status).toBe(404);
+        expect(res.text).toContain("Product No Longer Available | Bylot");
+        expect(res.text).toContain('name="robots" content="noindex, nofollow"');
+      } finally {
+        pool.query = originalQuery;
+      }
+    });
   });
 });

@@ -4,9 +4,15 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
 const _TAG_LENGTH = 16;
 
-// Secret key derived from environment or fallback key (32 bytes required for AES-256)
 function getMasterKey() {
-  const secret = process.env.ENCRYPTION_KEY || process.env.JWT_ACCESS_SECRET || "bylot_enterprise_security_default_master_key_32bytes!";
+  const isProd = process.env.NODE_ENV === "production";
+  const secret = process.env.ENCRYPTION_KEY || (!isProd ? process.env.JWT_ACCESS_SECRET : "");
+  if (!secret) {
+    if (isProd) {
+      throw new Error("[FATAL] ENCRYPTION_KEY must be configured in production.");
+    }
+    return crypto.createHash("sha256").update("dev_insecure_local_only_key_never_in_production").digest();
+  }
   return crypto.createHash("sha256").update(secret).digest();
 }
 

@@ -7,6 +7,7 @@ logs/
 backend/.env
 bylot/.env
 .env
+.env*
 .env.*
 !.env.example
 !**/.env.example
