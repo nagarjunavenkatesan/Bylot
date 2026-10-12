@@ -6,6 +6,9 @@ const { comparePassword } = require("../utils/password");
 const { getPagination, buildMeta } = require("../utils/pagination");
 const { findUserByEmail, findUserById } = require("../models/userModel");
 const { issueTokens } = require("./authController");
+const { clearHotCache } = require("./productController");
+const { deleteUploadedFile } = require("../middleware/uploadMiddleware");
+const auditLogger = require("../security/auditLogger");
 
 const adminLogin = asyncHandler(async (req, res) => {
   const user = await findUserByEmail(req.body.email);
@@ -86,18 +89,20 @@ const blockUser = asyncHandler(async (req, res) => {
 });
 
 const dashboardAnalytics = asyncHandler(async (req, res) => {
-  const [[usersRows], [sellersRows], [productsRows], [ordersRows]] = await Promise.all([
+  const [[usersRows], [sellersRows], [productsRows], [ordersRows], [expiredRows]] = await Promise.all([
     pool.execute("SELECT COUNT(*) AS total FROM users WHERE role = 'customer'"),
     pool.execute("SELECT COUNT(*) AS total FROM sellers"),
     pool.execute("SELECT COUNT(*) AS total FROM products WHERE status != 'deleted'"),
-    pool.execute("SELECT COUNT(*) AS total FROM orders")
+    pool.execute("SELECT COUNT(*) AS total FROM orders"),
+    pool.execute("SELECT COUNT(*) AS total FROM products WHERE status != 'deleted' AND expiry_date IS NOT NULL AND expiry_date < CURDATE()")
   ]);
 
   return success(res, "Dashboard analytics fetched successfully", {
     totalUsers: usersRows[0]?.total || 0,
     totalSellers: sellersRows[0]?.total || 0,
     totalProducts: productsRows[0]?.total || 0,
-    totalOrders: ordersRows[0]?.total || 0
+    totalOrders: ordersRows[0]?.total || 0,
+    totalExpired: expiredRows[0]?.total || 0
   });
 });
 
@@ -147,6 +152,275 @@ const deleteProduct = asyncHandler(async (req, res) => {
   const [result] = await pool.execute("UPDATE products SET status = 'deleted' WHERE id = ?", [req.params.id]);
   if (!result.affectedRows) throw new AppError("Product not found", 404);
   return success(res, "Product deleted successfully", null);
+});
+
+// ── Expired Products Management ────────────────────────────────────────────
+
+async function cleanupProductImages(imageUrls) {
+  if (!imageUrls || !imageUrls.length) return;
+  const uniqueUrls = [...new Set(imageUrls.filter(Boolean))];
+  for (const imgUrl of uniqueUrls) {
+    if (typeof imgUrl !== "string" || !imgUrl.startsWith("/uploads/")) continue;
+    try {
+      const [usage] = await pool.query(
+        "SELECT COUNT(*) AS count FROM products WHERE image_url = ? AND status != 'deleted'",
+        [imgUrl]
+      );
+      if (usage[0]?.count === 0) {
+        deleteUploadedFile(imgUrl);
+      }
+    } catch {
+      // Non-blocking cleanup
+    }
+  }
+}
+
+const getExpiredProducts = asyncHandler(async (req, res) => {
+  const { page, limit, offset } = getPagination(req.query);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 100);
+  const safeOffset = Math.max(0, Number(offset) || 0);
+  const q = req.query.q ? req.query.q.trim() : "";
+
+  let whereClause = "WHERE p.status != 'deleted' AND p.expiry_date IS NOT NULL AND p.expiry_date < CURDATE()";
+  let countParams;
+  let selectParams;
+
+  if (q) {
+    const escaped = q.replace(/[%_\\]/g, "\\$&");
+    const like = `%${escaped}%`;
+    whereClause += " AND (p.name LIKE ? OR p.product_item_id LIKE ? OR s.business_name LIKE ? OR c.name LIKE ?)";
+    countParams = [like, like, like, like];
+    selectParams = [like, like, like, like, safeLimit, safeOffset];
+  } else {
+    countParams = [];
+    selectParams = [safeLimit, safeOffset];
+  }
+
+  const [[filteredCount], [authoritativeCount], [products]] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*) AS total
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN sellers s ON s.id = p.seller_id
+       ${whereClause}`,
+      countParams
+    ),
+    pool.query(
+      "SELECT COUNT(*) AS total FROM products WHERE status != 'deleted' AND expiry_date IS NOT NULL AND expiry_date < CURDATE()"
+    ),
+    pool.query(
+      `SELECT p.id, p.product_item_id, p.seller_id, p.category_id, p.name, p.slug, p.sku, p.brand,
+              p.mrp, p.selling_price, p.discount_percent, p.stock_quantity, p.low_stock_threshold,
+              p.expiry_date, p.manufacture_date, p.batch_number, p.product_type, p.image_url,
+              p.status, p.created_at, p.updated_at,
+              c.name AS category_name,
+              s.business_name AS seller_name
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN sellers s ON s.id = p.seller_id
+       ${whereClause}
+       ORDER BY p.expiry_date ASC, p.id DESC
+       LIMIT ? OFFSET ?`,
+      selectParams
+    )
+  ]);
+
+  const meta = buildMeta(filteredCount[0]?.total || 0, page, safeLimit);
+  meta.authoritativeTotal = authoritativeCount[0]?.total || 0;
+
+  return success(res, "Expired products fetched successfully", products, 200, meta);
+});
+
+const getExpiredProductsCount = asyncHandler(async (req, res) => {
+  const [rows] = await pool.query(
+    "SELECT COUNT(*) AS total FROM products WHERE status != 'deleted' AND expiry_date IS NOT NULL AND expiry_date < CURDATE()"
+  );
+  return success(res, "Expired products count fetched successfully", {
+    count: rows[0]?.total || 0
+  });
+});
+
+const deleteAllExpiredProducts = asyncHandler(async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [expiredRows] = await connection.query(
+      `SELECT id, image_url 
+       FROM products 
+       WHERE status != 'deleted' 
+         AND expiry_date IS NOT NULL 
+         AND expiry_date < CURDATE() 
+       FOR UPDATE`
+    );
+
+    if (expiredRows.length === 0) {
+      await connection.rollback();
+      return success(res, "No expired products found to delete", { deletedCount: 0 });
+    }
+
+    const [result] = await connection.query(
+      `UPDATE products 
+       SET status = 'deleted' 
+       WHERE status != 'deleted' 
+         AND expiry_date IS NOT NULL 
+         AND expiry_date < CURDATE()`
+    );
+
+    await connection.commit();
+
+    clearHotCache();
+
+    cleanupProductImages(expiredRows.map(r => r.image_url)).catch(() => {});
+
+    auditLogger.logEvent("ADMIN_ACTION", req, {
+      severity: "INFO",
+      details: `Admin deleted all expired products: count=${result.affectedRows}`
+    });
+
+    return success(res, `${result.affectedRows} expired products deleted successfully`, {
+      deletedCount: result.affectedRows
+    });
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+});
+
+const deleteSelectedExpiredProducts = asyncHandler(async (req, res) => {
+  const rawIds = req.body.productIds;
+  if (!Array.isArray(rawIds) || rawIds.length === 0) {
+    throw new AppError("productIds must be a non-empty array", 400);
+  }
+
+  const uniqueIds = [...new Set(rawIds.map(Number).filter(n => Number.isInteger(n) && n > 0))];
+  if (uniqueIds.length === 0) {
+    throw new AppError("No valid product IDs provided", 400);
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [eligibleRows] = await connection.query(
+      `SELECT id, name, image_url, expiry_date, status
+       FROM products
+       WHERE id IN (?)
+         AND status != 'deleted'
+         AND expiry_date IS NOT NULL
+         AND expiry_date < CURDATE()
+       FOR UPDATE`,
+      [uniqueIds]
+    );
+
+    if (eligibleRows.length === 0) {
+      const [activeRows] = await connection.query(
+        `SELECT id, name FROM products 
+         WHERE id IN (?) 
+           AND status != 'deleted' 
+           AND (expiry_date IS NULL OR expiry_date >= CURDATE())`,
+        [uniqueIds]
+      );
+      await connection.rollback();
+
+      if (activeRows.length > 0) {
+        throw new AppError("Cannot delete active or non-expired products via the expired products endpoint", 400);
+      }
+
+      return success(res, "No eligible expired products were deleted", {
+        deletedCount: 0,
+        skippedCount: uniqueIds.length
+      });
+    }
+
+    const eligibleIds = eligibleRows.map(r => r.id);
+
+    const [result] = await connection.query(
+      "UPDATE products SET status = 'deleted' WHERE id IN (?)",
+      [eligibleIds]
+    );
+
+    await connection.commit();
+
+    clearHotCache();
+
+    cleanupProductImages(eligibleRows.map(r => r.image_url)).catch(() => {});
+
+    const deletedCount = result.affectedRows;
+    const skippedCount = uniqueIds.length - deletedCount;
+
+    auditLogger.logEvent("ADMIN_ACTION", req, {
+      severity: "INFO",
+      details: `Admin deleted selected expired products: deleted=${deletedCount}, skipped=${skippedCount}`
+    });
+
+    const msg = skippedCount > 0
+      ? `${deletedCount} expired products deleted successfully (${skippedCount} non-expired product(s) protected)`
+      : `${deletedCount} expired products deleted successfully`;
+
+    return success(res, msg, {
+      deletedCount,
+      skippedCount
+    });
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+});
+
+const deleteSingleExpiredProduct = asyncHandler(async (req, res) => {
+  const productId = Number(req.params.id);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query(
+      `SELECT id, image_url, expiry_date, status 
+       FROM products 
+       WHERE id = ? FOR UPDATE`,
+      [productId]
+    );
+
+    if (!rows[0]) {
+      await connection.rollback();
+      throw new AppError("Product not found", 404);
+    }
+
+    const product = rows[0];
+    if (product.status === "deleted") {
+      await connection.rollback();
+      throw new AppError("Product has already been deleted", 400);
+    }
+
+    const isExpired = product.expiry_date && new Date(product.expiry_date) < new Date();
+    if (!isExpired) {
+      await connection.rollback();
+      throw new AppError("Cannot delete active or non-expired product via the expired products endpoint", 400);
+    }
+
+    await connection.query("UPDATE products SET status = 'deleted' WHERE id = ?", [productId]);
+    await connection.commit();
+
+    clearHotCache();
+
+    cleanupProductImages([product.image_url]).catch(() => {});
+
+    auditLogger.logEvent("ADMIN_ACTION", req, {
+      severity: "INFO",
+      details: `Admin deleted single expired product: id=${productId}`
+    });
+
+    return success(res, "Expired product deleted successfully", { deletedCount: 1 });
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 });
 
 // ── Fraud Reports ──────────────────────────────────────────────────────────
@@ -277,6 +551,11 @@ module.exports = {
   manageProducts,
   updateProductStatus,
   deleteProduct,
+  getExpiredProducts,
+  getExpiredProductsCount,
+  deleteAllExpiredProducts,
+  deleteSelectedExpiredProducts,
+  deleteSingleExpiredProduct,
   districtAnalytics,
   getReports,
   resolveReport,

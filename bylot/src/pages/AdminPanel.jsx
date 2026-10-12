@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FaBoxOpen, FaChartLine, FaCheckCircle, FaEye, FaEyeSlash, FaFlag, FaLock, FaMapMarkedAlt, FaSearch, FaStore, FaTrash, FaUsers, FaUserShield } from 'react-icons/fa';
+import { FaBoxOpen, FaCalendarTimes, FaChartLine, FaCheckCircle, FaChevronLeft, FaChevronRight, FaExclamationTriangle, FaEye, FaEyeSlash, FaFlag, FaLock, FaMapMarkedAlt, FaSearch, FaStore, FaTrash, FaUsers, FaUserShield } from 'react-icons/fa';
 import PageTransition from '../components/PageTransition';
 import SEOHead from '../components/SEOHead';
 import { pageSEO } from '../utils/seo';
@@ -22,6 +22,7 @@ const tabs = [
     { id: 'users',     label: 'Users',     icon: FaUsers },
     { id: 'sellers',   label: 'Sellers',   icon: FaStore },
     { id: 'products',  label: 'Products',  icon: FaBoxOpen },
+    { id: 'expired',   label: 'Expired Products', icon: FaCalendarTimes },
     { id: 'reports',   label: 'Reports',   icon: FaFlag },
     { id: 'security',  label: 'Security & MCP', icon: FaUserShield },
 ];
@@ -67,6 +68,9 @@ const AdminPanel = () => {
         if (!localStorage.getItem('bylot-handshake')) {
             localStorage.setItem('bylot-handshake', Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2));
         }
+        if (window.location.hash === '#expired') {
+            setActiveTab('expired');
+        }
     }, []);
 
     const [analytics, setAnalytics]         = useState(null);
@@ -75,6 +79,7 @@ const AdminPanel = () => {
     const [products, setProducts]           = useState([]);
     const [reports, setReports]             = useState([]);
     const [pendingCount, setPendingCount]   = useState(0);
+    const [expiredCount, setExpiredCount]   = useState(0);
     const [districtStats, setDistrictStats] = useState([]);
     const [districtTotals, setDistrictTotals] = useState(null);
 
@@ -90,12 +95,13 @@ const AdminPanel = () => {
         const warnings = [];
 
         const requests = [
-            { key: 'dashboard',  run: () => adminRequest('/api/admin/dashboard') },
-            { key: 'districts',  run: () => adminRequest('/api/admin/district-analytics') },
-            { key: 'users',      run: () => adminRequest('/api/admin/users?limit=50') },
-            { key: 'sellers',    run: () => adminRequest('/api/admin/sellers?limit=50') },
-            { key: 'products',   run: () => adminRequest('/api/admin/products?limit=50') },
-            { key: 'reports',    run: () => adminRequest('/api/admin/reports?limit=100') },
+            { key: 'dashboard',    run: () => adminRequest('/api/admin/dashboard') },
+            { key: 'districts',    run: () => adminRequest('/api/admin/district-analytics') },
+            { key: 'users',        run: () => adminRequest('/api/admin/users?limit=50') },
+            { key: 'sellers',      run: () => adminRequest('/api/admin/sellers?limit=50') },
+            { key: 'products',     run: () => adminRequest('/api/admin/products?limit=50') },
+            { key: 'reports',      run: () => adminRequest('/api/admin/reports?limit=100') },
+            { key: 'expiredCount', run: () => adminRequest('/api/admin/products/expired/count') },
         ];
 
         const results = await Promise.allSettled(requests.map(r => r.run()));
@@ -104,10 +110,18 @@ const AdminPanel = () => {
         });
 
         const get = i => results[i].status === 'fulfilled' ? results[i].value : null;
-        const [dashboardRes, districtRes, usersRes, sellersRes, productsRes, reportsRes] =
-            [0, 1, 2, 3, 4, 5].map(get);
+        const [dashboardRes, districtRes, usersRes, sellersRes, productsRes, reportsRes, expiredRes] =
+            [0, 1, 2, 3, 4, 5, 6].map(get);
 
-        if (dashboardRes) setAnalytics(dashboardRes.data || null);
+        if (dashboardRes) {
+            setAnalytics(dashboardRes.data || null);
+            if (dashboardRes.data?.totalExpired !== undefined) {
+                setExpiredCount(dashboardRes.data.totalExpired);
+            }
+        }
+        if (expiredRes?.data?.count !== undefined) {
+            setExpiredCount(expiredRes.data.count);
+        }
         if (districtRes) { setDistrictStats(Array.isArray(districtRes.data) ? districtRes.data : []); setDistrictTotals(districtRes.totals || null); }
         else { setDistrictStats([]); setDistrictTotals(null); }
         if (usersRes)    setUsers(unwrapList(usersRes));
@@ -191,6 +205,7 @@ const AdminPanel = () => {
         { label: 'Customers', value: analytics?.totalUsers    || 0, icon: FaUsers },
         { label: 'Sellers',   value: analytics?.totalSellers  || 0, icon: FaStore },
         { label: 'Products',  value: analytics?.totalProducts || 0, icon: FaBoxOpen },
+        { label: 'Expired Products', value: expiredCount, icon: FaCalendarTimes },
         { label: 'Orders',    value: analytics?.totalOrders   || 0, icon: FaCheckCircle },
         { label: 'Revenue',   value: `Rs ${Number(analytics?.revenue || 0).toLocaleString('en-IN')}`, icon: FaChartLine },
         { label: 'Pending Reports', value: pendingCount, icon: FaFlag },
@@ -246,12 +261,15 @@ const AdminPanel = () => {
                     <div className="admin-tabs" role="tablist" aria-label="Admin sections">
                         {tabs.map(tab => {
                             const Icon = tab.icon;
-                            const badge = tab.id === 'reports' && pendingCount > 0;
+                            const isReports = tab.id === 'reports';
+                            const isExpired = tab.id === 'expired';
+                            const badge = (isReports && pendingCount > 0) || (isExpired && expiredCount > 0);
+                            const badgeNum = isReports ? pendingCount : expiredCount;
                             return (
                                 <button key={tab.id} className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
                                     onClick={() => setActiveTab(tab.id)} type="button">
                                     <Icon />{tab.label}
-                                    {badge && <span className="admin-tab-badge">{pendingCount}</span>}
+                                    {badge && <span className="admin-tab-badge">{badgeNum}</span>}
                                 </button>
                             );
                         })}
@@ -279,7 +297,7 @@ const AdminPanel = () => {
                     {activeTab === 'districts' && <DistrictAnalytics rows={districtStats} totals={districtTotals} loading={loading} />}
                     {activeTab === 'security' && <SecurityMcpDashboard />}
 
-                    {!['overview', 'districts', 'reports', 'security'].includes(activeTab) && (
+                    {!['overview', 'districts', 'reports', 'security', 'expired'].includes(activeTab) && (
                         <AdminSearch activeTab={activeTab} query={query} setQuery={setQuery} />
                     )}
 
@@ -398,6 +416,16 @@ const AdminPanel = () => {
                                 ])}
                             />
                         </>
+                    )}
+
+                    {/* ── Expired Products Tab ── */}
+                    {activeTab === 'expired' && (
+                        <ExpiredProductsTab
+                            adminRequest={adminRequest}
+                            authoritativeExpiredCount={expiredCount}
+                            setAuthoritativeExpiredCount={setExpiredCount}
+                            refreshAdminData={loadAdminData}
+                        />
                     )}
 
                     {/* ── Fraud Reports Tab ── */}
@@ -559,6 +587,476 @@ function FraudReportsTab({ reports, allReports, query, setQuery, runAction, admi
                             )}
                         </article>
                     ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ─── Expired Products Section ──────────────────────────────────────────────
+function ExpiredProductsTab({ adminRequest, authoritativeExpiredCount, setAuthoritativeExpiredCount, refreshAdminData }) {
+    const [products, setProducts]   = useState([]);
+    const [meta, setMeta]           = useState({ total: 0, page: 1, limit: 20, totalPages: 1 });
+    const [loading, setLoading]     = useState(false);
+    const [deleting, setDeleting]   = useState(false);
+    const [query, setQuery]         = useState('');
+    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const [page, setPage]           = useState(1);
+    const [selectedIds, setSelectedIds] = useState(new Set());
+    const [message, setMessage]     = useState('');
+    const [error, setError]         = useState('');
+    const [modal, setModal]         = useState({ open: false, type: null, singleId: null, singleName: '' });
+
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedQuery(query);
+            setPage(1);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [query]);
+
+    // Keyboard Escape listener to dismiss modal
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && modal.open && !deleting) {
+                setModal({ open: false, type: null, singleId: null, singleName: '' });
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [modal.open, deleting]);
+
+    const loadExpired = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const q = debouncedQuery ? `&q=${encodeURIComponent(debouncedQuery)}` : '';
+            const res = await adminRequest(`/api/admin/products/expired?page=${page}&limit=20${q}`);
+            setProducts(res.data || []);
+            setMeta(res.meta || { total: 0, page: 1, limit: 20, totalPages: 1 });
+            if (res.meta?.authoritativeTotal !== undefined) {
+                setAuthoritativeExpiredCount(res.meta.authoritativeTotal);
+            }
+        } catch (err) {
+            setError(err.message || 'Failed to load expired products');
+        } finally {
+            setLoading(false);
+        }
+    }, [adminRequest, debouncedQuery, page, setAuthoritativeExpiredCount]);
+
+    useEffect(() => {
+        loadExpired();
+    }, [loadExpired]);
+
+    // Selection logic
+    const allOnPageSelected = products.length > 0 && products.every(p => selectedIds.has(p.id));
+    const someOnPageSelected = products.some(p => selectedIds.has(p.id));
+
+    const toggleSelectAllPage = () => {
+        const next = new Set(selectedIds);
+        if (allOnPageSelected) {
+            products.forEach(p => next.delete(p.id));
+        } else {
+            products.forEach(p => next.add(p.id));
+        }
+        setSelectedIds(next);
+    };
+
+    const toggleSelectProduct = (id) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) {
+            next.delete(id);
+        } else {
+            next.add(id);
+        }
+        setSelectedIds(next);
+    };
+
+    const deselectAll = () => {
+        setSelectedIds(new Set());
+    };
+
+    // Deletion executions
+    const handleDeleteSelected = async () => {
+        if (selectedIds.size === 0) return;
+        setDeleting(true);
+        setError('');
+        setMessage('');
+        try {
+            const res = await adminRequest('/api/admin/products/expired/selected', {
+                method: 'DELETE',
+                body: JSON.stringify({ productIds: Array.from(selectedIds) })
+            });
+            const deleted = res.data?.deletedCount ?? selectedIds.size;
+            setMessage(`${deleted} expired product(s) deleted successfully.`);
+            setSelectedIds(new Set());
+            setModal({ open: false, type: null, singleId: null, singleName: '' });
+            await loadExpired();
+            if (refreshAdminData) refreshAdminData();
+        } catch (err) {
+            setError(err.message || 'Failed to delete selected expired products');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        setDeleting(true);
+        setError('');
+        setMessage('');
+        try {
+            const res = await adminRequest('/api/admin/products/expired', {
+                method: 'DELETE'
+            });
+            const deleted = res.data?.deletedCount ?? authoritativeExpiredCount;
+            setMessage(`${deleted} expired product(s) deleted successfully.`);
+            setSelectedIds(new Set());
+            setModal({ open: false, type: null, singleId: null, singleName: '' });
+            await loadExpired();
+            if (refreshAdminData) refreshAdminData();
+        } catch (err) {
+            setError(err.message || 'Failed to delete all expired products');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const handleDeleteSingle = async () => {
+        if (!modal.singleId) return;
+        setDeleting(true);
+        setError('');
+        setMessage('');
+        try {
+            await adminRequest(`/api/admin/products/expired/${modal.singleId}`, {
+                method: 'DELETE'
+            });
+            setMessage(`Expired product "${modal.singleName}" deleted successfully.`);
+            const next = new Set(selectedIds);
+            next.delete(modal.singleId);
+            setSelectedIds(next);
+            setModal({ open: false, type: null, singleId: null, singleName: '' });
+            await loadExpired();
+            if (refreshAdminData) refreshAdminData();
+        } catch (err) {
+            setError(err.message || 'Failed to delete expired product');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return 'N/A';
+        try {
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch {
+            return String(dateStr);
+        }
+    };
+
+    const getDaysExpired = (dateStr) => {
+        if (!dateStr) return null;
+        try {
+            const exp = new Date(dateStr);
+            const now = new Date();
+            const diffTime = now.setHours(0,0,0,0) - exp.setHours(0,0,0,0);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays <= 0) return 'Expires today';
+            if (diffDays === 1) return 'Expired yesterday';
+            return `Expired ${diffDays} days ago`;
+        } catch {
+            return null;
+        }
+    };
+
+    return (
+        <div className="expired-products-section">
+            {/* Authoritative Count Banner */}
+            <div className={`expired-count-banner ${authoritativeExpiredCount > 0 ? 'warning' : 'clean'}`}>
+                <div className="expired-banner-icon">
+                    {authoritativeExpiredCount > 0 ? <FaExclamationTriangle /> : <FaCheckCircle />}
+                </div>
+                <div className="expired-banner-text">
+                    <h3>
+                        {authoritativeExpiredCount > 0
+                            ? `⚠ ${authoritativeExpiredCount} product${authoritativeExpiredCount === 1 ? '' : 's'} currently expired`
+                            : 'No expired products currently'}
+                    </h3>
+                    <p>
+                        {authoritativeExpiredCount > 0
+                            ? 'The products listed below have passed their expiration date. Remove them to prevent consumers from seeing expired listings.'
+                            : 'All product inventory in the marketplace is within valid, unexpired dates.'}
+                    </p>
+                </div>
+            </div>
+
+            {(message || error) && (
+                <p className={`admin-alert ${error ? 'error' : 'success'}`}>
+                    {error || message}
+                </p>
+            )}
+
+            {/* Toolbar */}
+            <div className="expired-toolbar">
+                <div className="expired-search-wrap">
+                    <FaSearch />
+                    <input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Search expired products by name, ID, seller, category…"
+                        aria-label="Search expired products"
+                    />
+                </div>
+                <div className="expired-actions-group">
+                    <div className="selection-counter" aria-live="polite">
+                        Selected: <strong>{selectedIds.size}</strong>
+                    </div>
+                    {products.length > 0 && (
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={toggleSelectAllPage}
+                        >
+                            {allOnPageSelected ? 'Deselect Page' : 'Select Page'}
+                        </button>
+                    )}
+                    {selectedIds.size > 0 && (
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={deselectAll}
+                        >
+                            Deselect All
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        disabled={selectedIds.size === 0 || deleting}
+                        onClick={() => setModal({ open: true, type: 'selected' })}
+                    >
+                        <FaTrash /> Delete Selected ({selectedIds.size})
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        disabled={authoritativeExpiredCount === 0 || deleting}
+                        onClick={() => setModal({ open: true, type: 'all' })}
+                    >
+                        <FaTrash /> Delete All Expired ({authoritativeExpiredCount})
+                    </button>
+                </div>
+            </div>
+
+            {loading && <div className="admin-loading">Loading expired products…</div>}
+
+            {!loading && products.length === 0 && (
+                <div className="admin-empty">
+                    {debouncedQuery ? 'No expired products match your search.' : 'No expired products found.'}
+                </div>
+            )}
+
+            {/* Product Table */}
+            {!loading && products.length > 0 && (
+                <div className="admin-table-wrap">
+                    <table className="admin-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: '40px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={allOnPageSelected}
+                                        ref={el => { if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected; }}
+                                        onChange={toggleSelectAllPage}
+                                        aria-label="Select all on current page"
+                                    />
+                                </th>
+                                <th>Product</th>
+                                <th>Seller</th>
+                                <th>Category</th>
+                                <th>Expiry Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {products.map(item => {
+                                const isSelected = selectedIds.has(item.id);
+                                const daysLabel = getDaysExpired(item.expiry_date);
+                                const imgSrc = item.image_url
+                                    ? (item.image_url.startsWith('http') ? item.image_url : `${API_BASE_URL}/${String(item.image_url).replace(/^\/+/, '')}`)
+                                    : null;
+                                return (
+                                    <tr key={item.id} className={isSelected ? 'row-selected' : ''}>
+                                        <td>
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelectProduct(item.id)}
+                                                aria-label={`Select ${item.name}`}
+                                            />
+                                        </td>
+                                        <td>
+                                            <div className="product-table-cell">
+                                                {imgSrc && (
+                                                    <img
+                                                        src={imgSrc}
+                                                        alt={item.name}
+                                                        className="admin-product-thumb"
+                                                        onError={e => { e.target.style.display = 'none'; }}
+                                                    />
+                                                )}
+                                                <div>
+                                                    <div><strong>{item.name}</strong></div>
+                                                    <div>
+                                                        <span className="admin-product-id">
+                                                            {item.product_item_id || `#${item.id}`}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{item.seller_name || 'N/A'}</td>
+                                        <td>{item.category_name || 'N/A'}</td>
+                                        <td>
+                                            <div>
+                                                <strong>{formatDate(item.expiry_date)}</strong>
+                                                {daysLabel && <div className="expired-relative-tag">{daysLabel}</div>}
+                                            </div>
+                                        </td>
+                                        <td><StatusPill status={item.status} /></td>
+                                        <td>
+                                            <div className="admin-action-row">
+                                                <button
+                                                    type="button"
+                                                    className="admin-icon-btn danger"
+                                                    title={`Delete ${item.name}`}
+                                                    aria-label={`Delete ${item.name}`}
+                                                    disabled={deleting}
+                                                    onClick={() => setModal({
+                                                        open: true,
+                                                        type: 'single',
+                                                        singleId: item.id,
+                                                        singleName: item.name
+                                                    })}
+                                                >
+                                                    <FaTrash />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {/* Pagination */}
+            {!loading && meta.totalPages > 1 && (
+                <div className="admin-pagination">
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={page <= 1 || loading}
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        aria-label="Previous page"
+                    >
+                        <FaChevronLeft /> Previous
+                    </button>
+                    <span className="pagination-info">
+                        Page <strong>{page}</strong> of <strong>{meta.totalPages}</strong> ({meta.total} items)
+                    </span>
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={page >= meta.totalPages || loading}
+                        onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+                        aria-label="Next page"
+                    >
+                        Next <FaChevronRight />
+                    </button>
+                </div>
+            )}
+
+            {/* Confirmation Modal */}
+            {modal.open && (
+                <div
+                    className="admin-modal-backdrop"
+                    onClick={() => !deleting && setModal({ open: false, type: null, singleId: null, singleName: '' })}
+                    role="presentation"
+                >
+                    <div
+                        className="admin-modal"
+                        onClick={e => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="expired-modal-title"
+                    >
+                        <div className="admin-modal-header">
+                            <div className="admin-modal-icon danger">
+                                <FaExclamationTriangle />
+                            </div>
+                            <h3 id="expired-modal-title">
+                                {modal.type === 'all' && 'Delete All Expired Products?'}
+                                {modal.type === 'selected' && 'Delete Selected Expired Products?'}
+                                {modal.type === 'single' && 'Delete Expired Product?'}
+                            </h3>
+                        </div>
+                        <div className="admin-modal-body">
+                            {modal.type === 'all' && (
+                                <p>
+                                    There are currently <strong>{authoritativeExpiredCount}</strong> expired product(s) in the marketplace.
+                                    ALL currently expired products will be permanently removed from active listings.
+                                    <br /><br />
+                                    <span className="admin-modal-warning">⚠ This action cannot be undone.</span>
+                                </p>
+                            )}
+                            {modal.type === 'selected' && (
+                                <p>
+                                    You selected <strong>{selectedIds.size}</strong> expired product(s).
+                                    These products will be permanently removed from active listings.
+                                    <br /><br />
+                                    <span className="admin-modal-warning">⚠ This action cannot be undone.</span>
+                                </p>
+                            )}
+                            {modal.type === 'single' && (
+                                <p>
+                                    Are you sure you want to permanently delete <strong>{modal.singleName}</strong>?
+                                    This product will be removed from active marketplace listings.
+                                    <br /><br />
+                                    <span className="admin-modal-warning">⚠ This action cannot be undone.</span>
+                                </p>
+                            )}
+                        </div>
+                        <div className="admin-modal-footer">
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => setModal({ open: false, type: null, singleId: null, singleName: '' })}
+                                disabled={deleting}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-danger"
+                                disabled={deleting}
+                                onClick={() => {
+                                    if (modal.type === 'all') handleDeleteAll();
+                                    else if (modal.type === 'selected') handleDeleteSelected();
+                                    else if (modal.type === 'single') handleDeleteSingle();
+                                }}
+                            >
+                                {deleting ? 'Deleting…' : (
+                                    modal.type === 'all' ? 'Delete All Expired' :
+                                    modal.type === 'selected' ? `Delete Selected (${selectedIds.size})` :
+                                    'Delete Product'
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

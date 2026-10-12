@@ -26,11 +26,21 @@ const resolveReport = [
   body("adminNote").optional({ nullable: true }).trim().isLength({ max: 500 })
 ];
 
+const deleteSelectedExpired = [
+  body("productIds")
+    .isArray({ min: 1, max: 1000 })
+    .withMessage("productIds must be a non-empty array of product IDs"),
+  body("productIds.*")
+    .isInt({ min: 1 })
+    .withMessage("Each product ID must be a positive integer")
+];
+
 module.exports = {
   login,
   idParam,
   approveSeller,
   blockUser,
   productStatus,
-  resolveReport
+  resolveReport,
+  deleteSelectedExpired
 };

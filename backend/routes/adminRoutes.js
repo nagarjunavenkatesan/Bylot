@@ -17,6 +17,11 @@ router.patch("/users/:id/status", validators.idParam, validators.blockUser, vali
 router.get("/dashboard", controller.dashboardAnalytics);
 router.get("/district-analytics", controller.districtAnalytics);
 router.get("/products", controller.manageProducts);
+router.get("/products/expired", controller.getExpiredProducts);
+router.get("/products/expired/count", controller.getExpiredProductsCount);
+router.delete("/products/expired", controller.deleteAllExpiredProducts);
+router.delete("/products/expired/selected", validators.deleteSelectedExpired, validate, controller.deleteSelectedExpiredProducts);
+router.delete("/products/expired/:id", validators.idParam, validate, controller.deleteSingleExpiredProduct);
 router.get("/products/by-id", controller.searchProductByItemId);
 router.patch("/products/:id/status", validators.idParam, validators.productStatus, validate, controller.updateProductStatus);
 router.delete("/products/:id", validators.idParam, validate, controller.deleteProduct);
