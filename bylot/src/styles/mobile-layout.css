@@ -305,9 +305,33 @@ body.dark-mode .savings-badge {
     padding: 0.18rem 0.45rem !important;
   }
 
+  .compact-expired-badge,
+  .compact-expiry-badge {
+    font-size: 0.64rem !important;
+    padding: 0.2rem 0.45rem !important;
+  }
+
   .discount-ribbon {
     font-size: 0.64rem !important;
     padding: 0.25rem 0.5rem 0.25rem 0.4rem !important;
+  }
+
+  .card-expiry-block {
+    padding: 0.4rem 0.55rem !important;
+    margin: 0.35rem 0 0.5rem 0 !important;
+  }
+
+  .card-expiry-row {
+    font-size: 0.78rem !important;
+    gap: 0.3rem !important;
+  }
+
+  .card-expiry-date {
+    font-size: 0.82rem !important;
+  }
+
+  .card-expiry-relative {
+    font-size: 0.72rem !important;
   }
 
   .savings-badge {

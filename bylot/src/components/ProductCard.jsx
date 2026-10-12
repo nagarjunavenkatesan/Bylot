@@ -4,6 +4,7 @@ import Card from './Card';
 import { FaTrash, FaEdit, FaFlag } from 'react-icons/fa';
 import { apiRequest, getAccessToken } from '../api/backendApi';
 import { getProductPricing } from '../utils/pricing';
+import { formatCardExpiry } from '../utils/expiry';
 
 const REPORT_REASONS = [
     { value: 'fake_product',      label: 'Fake / counterfeit product' },
@@ -51,12 +52,18 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
     };
 
     const pricing = getProductPricing(product);
+    const expiryDetails = formatCardExpiry(product);
 
     const distNum = product.distance != null ? Number(product.distance) : null;
     const hasValidDistance = distNum != null && !isNaN(distNum);
 
-    const isExpired = product.isExpired || product.expiryStatus === 'Expired';
-    const isNearExpiry = product.expiryStatus === 'Near Expiry' || product.expiryStatus === 'Expiring Soon';
+    const isExpired = Boolean(
+        expiryDetails?.isExpired ||
+        product.isExpired ||
+        product.expiryStatus === 'Expired' ||
+        product.status === 'expired'
+    );
+    const isNearExpiry = !isExpired && (product.expiryStatus === 'Near Expiry' || product.expiryStatus === 'Expiring Soon');
 
     return (
         <Card className="listing-card google-skill-card">
@@ -81,27 +88,32 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
                             }
                         }}
                     />
-                    <span
-                        className="expiry-tag"
-                        style={{
-                            backgroundColor: isExpired
-                                ? 'rgba(220, 38, 38, 0.9)'
-                                : isNearExpiry
-                                ? 'rgba(217, 119, 6, 0.9)'
-                                : 'rgba(16, 185, 129, 0.9)',
-                            color: '#ffffff',
-                            fontWeight: 700
-                        }}
-                    >
-                        {isExpired ? '⚠️ Expired: ' : 'Expires: '}{product.expiry || 'N/A'}
-                    </span>
+
+                    {/* Compact Image Overlay Badges (never overlap date or each other) */}
+                    <div className="card-image-overlays">
+                        {isExpired ? (
+                            <span className="compact-expired-badge" aria-label="Product is expired">
+                                ⚠ Expired
+                            </span>
+                        ) : isNearExpiry ? (
+                            <span className="compact-expiry-badge near-expiry">
+                                ⚠ Expiring Soon
+                            </span>
+                        ) : (
+                            <span className="compact-expiry-badge fresh">
+                                {product.expiryStatus || 'Fresh'}
+                            </span>
+                        )}
+
+                        {pricing.hasSavings && (
+                            <span className="discount-ribbon" aria-hidden="true">
+                                {pricing.ribbonLabel}
+                            </span>
+                        )}
+                    </div>
+
                     {hasValidDistance && (
                         <span className="distance-tag">{distNum.toFixed(1)} km away</span>
-                    )}
-                    {pricing.hasSavings && (
-                        <span className="discount-ribbon" aria-hidden="true">
-                            {pricing.ribbonLabel}
-                        </span>
                     )}
                 </div>
             </Link>
@@ -109,31 +121,50 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
             {/* Product details */}
             <div className="listing-details">
                 <Link to={`/product/${product.id}`} style={{ display: 'block', color: 'inherit' }}>
-                    <div style={{ marginBottom: '0.35rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: '800', color: 'var(--primary)', background: 'rgba(99, 102, 241, 0.14)', padding: '2px 7px', borderRadius: '6px', display: 'inline-block' }}>
+                    {/* Item ID and Expired Status */}
+                    <div className="card-meta-row">
+                        <span className="card-item-id">
                             Item ID: {product.product_item_id || `#${product.id}`}
                         </span>
                         {product.expiryStatus && (
-                            <span style={{
-                                fontSize: '0.72rem',
-                                fontWeight: '700',
-                                padding: '2px 7px',
-                                borderRadius: '6px',
-                                backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.15)' : isNearExpiry ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                                color: isExpired ? '#dc2626' : isNearExpiry ? '#d97706' : '#059669'
-                            }}>
+                            <span className={`card-status-pill ${isExpired ? 'expired' : isNearExpiry ? 'near-expiry' : 'fresh'}`}>
                                 {product.expiryStatus}
                             </span>
                         )}
                     </div>
+
+                    {/* Product Name */}
                     <h3 className="card-title">{product.name}</h3>
-                    <p className="card-subtitle">{product.location}</p>
+
+                    {/* Seller / Location */}
+                    <p className="card-subtitle">
+                        {product.location || (product.seller_name ? `Available from ${product.seller_name}` : 'Available from Bylot seller')}
+                    </p>
+
+                    {/* Expiry Details Section (Always visible, prominently styled for expired products) */}
+                    {expiryDetails?.formattedDate && (
+                        <div className={`card-expiry-block ${isExpired ? 'is-expired' : ''}`}>
+                            <div className="card-expiry-row">
+                                <span className="card-expiry-label">Expiry date:</span>
+                                <strong className="card-expiry-date">{expiryDetails.formattedDate}</strong>
+                            </div>
+                            {expiryDetails.relativeLabel && (
+                                <div className="card-expiry-relative">
+                                    {expiryDetails.relativeLabel}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Price Row */}
                     <div className="price-row">
                         <span className="current-price">{pricing.formattedSelling || `₹${product.price}`}</span>
                         {pricing.hasSavings && (
                             <span className="original-price">{pricing.formattedMrp}</span>
                         )}
                     </div>
+
+                    {/* Savings Badge */}
                     {pricing.hasSavings && (
                         <p className="savings-badge" aria-label={pricing.ariaLabel}>
                             {pricing.savingsLabel}
@@ -153,11 +184,17 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
                             </Link>
                         )}
                         <button
-                            className="btn w-full"
-                            onClick={e => { e.preventDefault(); e.stopPropagation(); if (isAdmin && onAdminDelete) onAdminDelete(product.id); else if (onDelete) onDelete(product.id); }}
-                            style={{ padding: '6px 12px', fontSize: '0.85rem', background: '#ef4444', color: 'white', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            type="button"
+                            className="btn btn-danger w-full"
+                            onClick={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (isAdmin && onAdminDelete) onAdminDelete(product.id, product.name);
+                                else if (onDelete) onDelete(product.id);
+                            }}
+                            style={{ padding: '8px 14px', fontSize: '0.85rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                         >
-                            <FaTrash style={{ marginRight: '5px' }} /> Delete
+                            <FaTrash /> Delete
                         </button>
                     </div>
                 )}

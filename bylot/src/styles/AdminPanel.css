@@ -1000,3 +1000,93 @@ tr.row-selected {
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
 }
+
+/* ── Expired Products Card Grid & View Mode ───────────────── */
+.admin-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-glass);
+    border: 1px solid rgba(150, 150, 150, 0.22);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    gap: 2px;
+}
+
+.admin-view-btn {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0.42rem 0.75rem;
+    font-size: 0.84rem;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all var(--transition-fast);
+}
+
+.admin-view-btn:hover {
+    color: var(--text-main);
+}
+
+.admin-view-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.admin-expired-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.admin-expired-card-item {
+    position: relative;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-expired-card-item .listing-card {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+}
+
+.admin-expired-card-item.is-selected {
+    outline: 2px solid var(--primary);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
+}
+
+.admin-card-select-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.85rem;
+    background: var(--bg-glass);
+    border: 1px solid rgba(150, 150, 150, 0.22);
+    border-bottom: 0;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.admin-card-select-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-main);
+    user-select: none;
+}
+
+.admin-card-select-label input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    accent-color: var(--primary);
+}

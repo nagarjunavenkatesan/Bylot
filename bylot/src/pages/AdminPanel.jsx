@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FaBoxOpen, FaCalendarTimes, FaChartLine, FaCheckCircle, FaChevronLeft, FaChevronRight, FaExclamationTriangle, FaEye, FaEyeSlash, FaFlag, FaLock, FaMapMarkedAlt, FaSearch, FaStore, FaTrash, FaUsers, FaUserShield } from 'react-icons/fa';
+import { FaBoxOpen, FaCalendarTimes, FaChartLine, FaCheckCircle, FaChevronLeft, FaChevronRight, FaExclamationTriangle, FaEye, FaEyeSlash, FaFlag, FaLock, FaMapMarkedAlt, FaSearch, FaStore, FaThLarge, FaThList, FaTrash, FaUsers, FaUserShield } from 'react-icons/fa';
 import PageTransition from '../components/PageTransition';
 import SEOHead from '../components/SEOHead';
 import { pageSEO } from '../utils/seo';
 import DistrictAnalytics from '../components/DistrictAnalytics';
 import SecurityMcpDashboard from '../components/SecurityMcpDashboard';
-import { API_BASE_URL, getAccessToken, setAccessToken } from '../api/backendApi';
+import ProductCard from '../components/ProductCard';
+import { API_BASE_URL, getAccessToken, normalizeProduct, setAccessToken } from '../api/backendApi';
+import { formatCardExpiry } from '../utils/expiry';
 import { useAuth } from '../context/AuthContext';
 import '../styles/AdminPanel.css';
 
@@ -605,6 +607,7 @@ function ExpiredProductsTab({ adminRequest, authoritativeExpiredCount, setAuthor
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [message, setMessage]     = useState('');
     const [error, setError]         = useState('');
+    const [viewMode, setViewMode]   = useState('cards');
     const [modal, setModal]         = useState({ open: false, type: null, singleId: null, singleName: '' });
 
     // Debounce search query
@@ -809,6 +812,28 @@ function ExpiredProductsTab({ adminRequest, authoritativeExpiredCount, setAuthor
                     />
                 </div>
                 <div className="expired-actions-group">
+                    {/* View Switcher: Cards vs Table */}
+                    <div className="admin-view-toggle" role="group" aria-label="Display view mode">
+                        <button
+                            type="button"
+                            className={`admin-view-btn ${viewMode === 'cards' ? 'active' : ''}`}
+                            onClick={() => setViewMode('cards')}
+                            title="Cards view"
+                            aria-label="Switch to Cards view"
+                        >
+                            <FaThLarge /> Cards
+                        </button>
+                        <button
+                            type="button"
+                            className={`admin-view-btn ${viewMode === 'table' ? 'active' : ''}`}
+                            onClick={() => setViewMode('table')}
+                            title="Table view"
+                            aria-label="Switch to Table view"
+                        >
+                            <FaThList /> Table
+                        </button>
+                    </div>
+
                     <div className="selection-counter" aria-live="polite">
                         Selected: <strong>{selectedIds.size}</strong>
                     </div>
@@ -857,8 +882,59 @@ function ExpiredProductsTab({ adminRequest, authoritativeExpiredCount, setAuthor
                 </div>
             )}
 
-            {/* Product Table */}
-            {!loading && products.length > 0 && (
+            {/* Product Cards View */}
+            {!loading && products.length > 0 && viewMode === 'cards' && (
+                <div className="admin-expired-cards-grid">
+                    {products.map(item => {
+                        const isSelected = selectedIds.has(item.id);
+                        const normalized = normalizeProduct({
+                            ...item,
+                            selling_price: item.selling_price || item.price,
+                            price: item.selling_price || item.price,
+                            mrp: item.mrp || item.originalPrice,
+                            image_url: item.image_url,
+                            image: item.image_url,
+                            expiry_date: item.expiry_date,
+                            expiry: item.expiry_date,
+                            expiryStatus: 'Expired',
+                            isExpired: true,
+                            location: item.seller_name ? `Available from ${item.seller_name}` : 'Available from Bylot seller'
+                        });
+
+                        return (
+                            <div key={item.id} className={`admin-expired-card-item ${isSelected ? 'is-selected' : ''}`}>
+                                <div className="admin-card-select-bar">
+                                    <label className="admin-card-select-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => toggleSelectProduct(item.id)}
+                                            aria-label={`Select ${item.name}`}
+                                        />
+                                        <span>{isSelected ? 'Selected' : 'Select'}</span>
+                                    </label>
+                                    <span className="admin-product-id" style={{ fontSize: '0.74rem' }}>
+                                        {item.product_item_id || `#${item.id}`}
+                                    </span>
+                                </div>
+                                <ProductCard
+                                    product={normalized}
+                                    isAdmin={true}
+                                    onAdminDelete={(id, name) => setModal({
+                                        open: true,
+                                        type: 'single',
+                                        singleId: id,
+                                        singleName: name || item.name
+                                    })}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* Product Table View */}
+            {!loading && products.length > 0 && viewMode === 'table' && (
                 <div className="admin-table-wrap">
                     <table className="admin-table">
                         <thead>
@@ -883,7 +959,7 @@ function ExpiredProductsTab({ adminRequest, authoritativeExpiredCount, setAuthor
                         <tbody>
                             {products.map(item => {
                                 const isSelected = selectedIds.has(item.id);
-                                const daysLabel = getDaysExpired(item.expiry_date);
+                                const expInfo = formatCardExpiry(item);
                                 const imgSrc = item.image_url
                                     ? (item.image_url.startsWith('http') ? item.image_url : `${API_BASE_URL}/${String(item.image_url).replace(/^\/+/, '')}`)
                                     : null;
@@ -921,8 +997,8 @@ function ExpiredProductsTab({ adminRequest, authoritativeExpiredCount, setAuthor
                                         <td>{item.category_name || 'N/A'}</td>
                                         <td>
                                             <div>
-                                                <strong>{formatDate(item.expiry_date)}</strong>
-                                                {daysLabel && <div className="expired-relative-tag">{daysLabel}</div>}
+                                                <strong>{expInfo?.formattedDate || item.expiry_date}</strong>
+                                                {expInfo?.relativeLabel && <div className="expired-relative-tag">{expInfo.relativeLabel}</div>}
                                             </div>
                                         </td>
                                         <td><StatusPill status={item.status} /></td>
