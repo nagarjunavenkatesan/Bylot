@@ -46,24 +46,25 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
+              const normalizedId = id.replace(/\\/g, '/');
               if (
-                id.includes('node_modules/react/') ||
-                id.includes('node_modules/react-dom/') ||
-                id.includes('node_modules/react-router/') ||
-                id.includes('node_modules/react-router-dom/')
+                normalizedId.includes('node_modules/react/') ||
+                normalizedId.includes('node_modules/react-dom/') ||
+                normalizedId.includes('node_modules/react-router/') ||
+                normalizedId.includes('node_modules/react-router-dom/')
               ) {
                 return 'vendor-react';
               }
-              if (id.includes('framer-motion')) {
+              if (normalizedId.includes('framer-motion')) {
                 return 'vendor-framer';
               }
-              if (id.includes('react-icons')) {
+              if (normalizedId.includes('react-icons')) {
                 return 'vendor-icons';
               }
-              if (id.includes('react-parallax-tilt')) {
+              if (normalizedId.includes('react-parallax-tilt')) {
                 return 'vendor-tilt';
               }
-              if (id.includes('@react-oauth')) {
+              if (normalizedId.includes('@react-oauth')) {
                 return 'vendor-auth';
               }
               return 'vendor-libs';

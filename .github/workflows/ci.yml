@@ -30,7 +30,7 @@ jobs:
 
       - name: Block Telegram code
         run: |
-          if git grep -i -E "telegram|botfather|bot_token|api\.telegram" -- ":!*.test.js"; then
+          if git grep -i -E "telegram|botfather|bot_token|api\.telegram" -- ":!*.test.js" ":!.github/**"; then
             echo "Telegram references found"
             exit 1
           else
@@ -46,7 +46,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: backend
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Lint Backend
         working-directory: backend
@@ -59,11 +59,14 @@ jobs:
       - name: Initialize test database
         working-directory: backend
         env:
-          MYSQL_PWD: ${{ env.CI_MYSQL_PWD }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
+          DB_NAME: bylot_test
         run: |
-          mysql -h 127.0.0.1 -u root -e "CREATE DATABASE IF NOT EXISTS bylot_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-          mysql -h 127.0.0.1 -u root bylot_test < config/schema.sql
-          DB_HOST=127.0.0.1 DB_PORT=3306 DB_USER=root DB_PASSWORD="$CI_MYSQL_PWD" DB_NAME=bylot_test node scripts/migrate.js --db bylot_test
+          node init_db.js
+          node scripts/migrate.js --db bylot_test
 
       - name: Run Backend Tests
         working-directory: backend
@@ -81,6 +84,10 @@ jobs:
 
       - name: Security audit script
         working-directory: backend
+        env:
+          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
+          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
+          SESSION_SECRET: ci_test_super_secret_session_key_minimum_32_chars!
         run: npm run security-audit
 
   frontend:
@@ -100,7 +107,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: bylot
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Lint Frontend
         working-directory: bylot

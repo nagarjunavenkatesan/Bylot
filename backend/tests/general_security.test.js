@@ -187,7 +187,7 @@ describe("General Security, Sanitization and Resilience", () => {
     let output;
     try {
       output = execSync(
-        'git grep -i -E "telegram|botfather|bot_token|api\\.telegram" -- ":!*.test.js"',
+        'git grep -i -E "telegram|botfather|bot_token|api\\.telegram" -- ":!*.test.js" ":!.github/**"',
         { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
       ).trim();
     } catch (err) {
