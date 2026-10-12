@@ -208,8 +208,8 @@ const candidateDistPaths = [
   path.resolve(__dirname, "..", "bylot", "dist"),
   path.resolve("/bylot/dist")
 ].filter(Boolean);
-const frontendDist = candidateDistPaths.find(p => fs.existsSync(p)) || candidateDistPaths[0] || path.resolve(__dirname, "..", "bylot", "dist");
-if (fs.existsSync(frontendDist)) {
+const frontendDist = candidateDistPaths.find(p => fs.existsSync(p));
+if (frontendDist && fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist, {
     maxAge: "1d",
     etag: true,
@@ -220,37 +220,57 @@ if (fs.existsSync(frontendDist)) {
       }
     }
   }));
-
-  const indexHtmlPath = path.join(frontendDist, "index.html");
-
-  app.get("*", async (req, res, next) => {
-    if (
-      req.path.startsWith("/api") ||
-      req.path.startsWith("/uploads") ||
-      req.path.startsWith("/health") ||
-      req.path.startsWith("/mcp") ||
-      req.path.includes("/.") ||
-      req.path.endsWith(".env") ||
-      req.path.endsWith(".key") ||
-      req.path.endsWith(".pem") ||
-      /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map|webp|avif|json|txt|xml)$/i.test(req.path)
-    ) {
-      return next();
-    }
-
-    try {
-      const template = fs.readFileSync(indexHtmlPath, "utf8");
-      const { status, ...seoOptions } = await validateAndGetPageSeo(req.path, req.query);
-      const renderedHtml = renderHtmlWithSeo(template, seoOptions);
-
-      res.status(status).setHeader("Content-Type", "text/html; charset=UTF-8");
-      res.setHeader("Cache-Control", status === 200 ? "public, max-age=300" : "no-cache, no-store, must-revalidate");
-      res.send(renderedHtml);
-    } catch (err) {
-      next(err);
-    }
-  });
 }
+
+// Locate HTML template for SSR route validation: dist/index.html if built, fallback to bylot/index.html
+const candidateTemplatePaths = [
+  frontendDist ? path.join(frontendDist, "index.html") : null,
+  path.resolve(__dirname, "..", "bylot", "dist", "index.html"),
+  path.resolve(__dirname, "..", "bylot", "index.html")
+].filter(Boolean);
+const indexHtmlPath = candidateTemplatePaths.find(p => fs.existsSync(p));
+
+const fallbackHtmlTemplate = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bylot</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>`;
+
+app.get("*", async (req, res, next) => {
+  if (
+    req.path.startsWith("/api") ||
+    req.path.startsWith("/uploads") ||
+    req.path.startsWith("/health") ||
+    req.path.startsWith("/mcp") ||
+    req.path.includes("/.") ||
+    req.path.endsWith(".env") ||
+    req.path.endsWith(".key") ||
+    req.path.endsWith(".pem") ||
+    /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map|webp|avif|json|txt|xml)$/i.test(req.path)
+  ) {
+    return next();
+  }
+
+  try {
+    const template = indexHtmlPath && fs.existsSync(indexHtmlPath)
+      ? fs.readFileSync(indexHtmlPath, "utf8")
+      : fallbackHtmlTemplate;
+    const { status, ...seoOptions } = await validateAndGetPageSeo(req.path, req.query);
+    const renderedHtml = renderHtmlWithSeo(template, seoOptions);
+
+    res.status(status).setHeader("Content-Type", "text/html; charset=UTF-8");
+    res.setHeader("Cache-Control", status === 200 ? "public, max-age=300" : "no-cache, no-store, must-revalidate");
+    res.send(renderedHtml);
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.use(notFound);
 app.use(errorHandler);
