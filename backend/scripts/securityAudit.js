@@ -1,11 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-function runAudit() {
-  console.log("=================================================");
-  console.log("          BYLOT REAL SECURITY AUDITOR            ");
-  console.log("=================================================\n");
-
+function runSecurityAudit({ quiet = false } = {}) {
   const failures = [];
   const warnings = [];
   const passes = [];
@@ -24,7 +20,6 @@ function runAudit() {
   } else {
     passes.push("No committed secret files (.env, certs/*.pem) detected in backend tree.");
   }
-
 
   // Check 2: .gitignore properly ignores secrets
   const gitignorePath = path.join(rootDir, "..", ".gitignore");
@@ -102,30 +97,48 @@ function runAudit() {
     }
   }
 
-  // Summary
-  console.log("PASSES:");
-  for (const p of passes) {
-    console.log(` [✓ PASS] ${p}`);
-  }
+  const passed = failures.length === 0;
 
-  if (warnings.length > 0) {
-    console.log("\nWARNINGS:");
-    for (const w of warnings) {
-      console.log(` [! WARN] ${w}`);
+  if (!quiet) {
+    console.log("=================================================");
+    console.log("          BYLOT REAL SECURITY AUDITOR            ");
+    console.log("=================================================\n");
+
+    console.log("PASSES:");
+    for (const p of passes) {
+      console.log(` [✓ PASS] ${p}`);
+    }
+
+    if (warnings.length > 0) {
+      console.log("\nWARNINGS:");
+      for (const w of warnings) {
+        console.log(` [! WARN] ${w}`);
+      }
+    }
+
+    if (failures.length > 0) {
+      console.log("\nFAILURES:");
+      for (const f of failures) {
+        console.log(` [✗ FAIL] ${f}`);
+      }
+      console.log("\n❌ SECURITY AUDIT FAILED.\n");
+    } else {
+      console.log("\n✅ SECURITY AUDIT PASSED: All security checks satisfied.\n");
     }
   }
 
-  if (failures.length > 0) {
-    console.log("\nFAILURES:");
-    for (const f of failures) {
-      console.log(` [✗ FAIL] ${f}`);
-    }
-    console.log("\n❌ SECURITY AUDIT FAILED.\n");
-    process.exit(1);
-  }
-
-  console.log("\n✅ SECURITY AUDIT PASSED: All security checks satisfied.\n");
-  process.exit(0);
+  return {
+    passed,
+    passes,
+    warnings,
+    failures
+  };
 }
 
-runAudit();
+module.exports = runSecurityAudit;
+
+if (require.main === module) {
+  const result = runSecurityAudit();
+  process.exit(result.passed ? 0 : 1);
+}
+

@@ -2,6 +2,8 @@
 
 Your application consists of two parts: the Backend (API) and the Frontend (React App). Both need to be running for the site to work correctly.
 
+> **Notice:** BYLOT DOES NOT USE ONLINE PAYMENT PROCESSING OR TELEGRAM INTEGRATION.
+
 ## Prerequisites
 - Node.js installed
 - PostgreSQL installed and running (Credentials configured in `server/.env`)

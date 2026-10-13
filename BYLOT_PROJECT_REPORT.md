@@ -10,6 +10,8 @@
 
 Bylot is a full-stack marketplace web application that connects local sellers of near-expiry, discounted, and surplus goods with nearby buyers. The platform aims to reduce food waste and help consumers save money by surfacing deals from local sellers based on geographic proximity.
 
+> **Notice:** BYLOT DOES NOT USE ONLINE PAYMENT PROCESSING OR TELEGRAM INTEGRATION.
+
 The project consists of three parts:
 
 | Part | Technology | Purpose |

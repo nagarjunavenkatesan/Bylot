@@ -230,7 +230,7 @@ const GoogleSkillShowcase = () => {
                 Google Skill Verified Platform
               </h4>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
-                Every transaction contributes to verified carbon offset metrics and local community impact logs.
+                Every order contributes to verified carbon offset metrics and local community impact logs.
               </p>
             </div>
           </div>

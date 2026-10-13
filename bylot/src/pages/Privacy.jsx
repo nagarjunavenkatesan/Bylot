@@ -36,7 +36,7 @@ const Privacy = () => {
                 <div className="card" style={{ padding: '2.5rem', borderRadius: '12px', lineHeight: '1.7' }}>
                     <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>1. Information We Collect</h2>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        Bylot collects minimal required information to deliver marketplace functionality, including user account credentials, contact information, location coordinates (with explicit permission), and transaction history.
+                        Bylot collects minimal required information to deliver marketplace functionality, including user account credentials, contact information, location coordinates (with explicit permission), and order history.
                     </p>
 
                     <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>2. How We Use Information</h2>

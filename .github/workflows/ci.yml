@@ -30,11 +30,20 @@ jobs:
 
       - name: Block Telegram code
         run: |
-          if git grep -i -E "telegram|botfather|bot_token|api\.telegram" -- ":!*.test.js" ":!.github/**"; then
+          if git grep -i -E "telegram|botfather|bot_token|api\.telegram" -- ":!*.test.js" ":!.github/**" ":!*.md"; then
             echo "Telegram references found"
             exit 1
           else
             echo "No Telegram references"
+          fi
+
+      - name: Block Payment code
+        run: |
+          if git grep -i -E "razorpay|stripe|paypal" -- ":!migrations" ":!docs/MIGRATIONS.md" ":!*.test.js" ":!.github/**" ":!*.md" ":!*package-lock.json"; then
+            echo "Payment references found"
+            exit 1
+          else
+            echo "No payment references"
           fi
 
       - name: Setup Node.js
@@ -89,6 +98,18 @@ jobs:
           JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
           SESSION_SECRET: ci_test_super_secret_session_key_minimum_32_chars!
         run: npm run security-audit
+
+      - name: Database backup & restore test
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
+          DB_NAME: bylot_test
+          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
+          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
+        run: npm run backup-test
 
   frontend:
     name: Frontend Lint, Audit, Build & Tests

@@ -170,7 +170,7 @@ describe("General Security, Sanitization and Resilience", () => {
     let output;
     try {
       output = execSync(
-        'git grep -i -E "payment|razorpay" -- ":!migrations" ":!docs/MIGRATIONS.md" ":!*.test.js"',
+        'git grep -i -E "payment|razorpay" -- ":!migrations" ":!docs/MIGRATIONS.md" ":!*.md" ":!*.test.js"',
         { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
       ).trim();
     } catch (err) {
@@ -187,7 +187,7 @@ describe("General Security, Sanitization and Resilience", () => {
     let output;
     try {
       output = execSync(
-        'git grep -i -E "telegram|botfather|bot_token|api\\.telegram" -- ":!*.test.js" ":!.github/**"',
+        'git grep -i -E "telegram|botfather|bot_token|api\\.telegram" -- ":!*.test.js" ":!.github/**" ":!*.md"',
         { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
       ).trim();
     } catch (err) {

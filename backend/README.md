@@ -2,6 +2,8 @@
 
 Production-ready centralized REST API for the Bylot Android app, website app, and admin panel.
 
+> **Notice:** BYLOT DOES NOT USE ONLINE PAYMENT PROCESSING OR TELEGRAM INTEGRATION.
+
 ## Stack
 
 - Node.js

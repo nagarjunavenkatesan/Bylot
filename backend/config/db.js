@@ -4,7 +4,7 @@ const env = require("./env");
 const pool = mysql.createPool({
   ...env.db,
   waitForConnections: true,
-  queueLimit: 100,
+  queueLimit: Number(process.env.DB_QUEUE_LIMIT || 1000),
   connectTimeout: 10000,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,

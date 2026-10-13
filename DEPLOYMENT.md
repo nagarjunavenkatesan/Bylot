@@ -1,7 +1,8 @@
 # Bylot Production Deployment Guide
 
 Production Domain: `https://bylot.in`  
-Architecture: Host Nginx (SSL / Certbot termination) → Docker Compose (`frontend` on `127.0.0.1:8080`, `backend` on `127.0.0.1:5000`, private MySQL on internal bridge network).
+Architecture: Host Nginx (SSL / Certbot termination) → Docker Compose (`frontend` on `127.0.0.1:8080`, `backend` on `127.0.0.1:5000`, private MySQL on internal bridge network).  
+> **Notice:** BYLOT DOES NOT USE ONLINE PAYMENT PROCESSING OR TELEGRAM INTEGRATION.
 
 ---
 

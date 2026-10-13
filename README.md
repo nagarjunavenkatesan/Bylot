@@ -1,6 +1,7 @@
 # BYLOT — Hyperlocal Smart Marketplace
 
-> **Mission:** Reduce losses from expiring goods and connect local stores with nearby buyers for discounted, near-expiry, and surplus essentials.
+> **Mission:** Reduce losses from expiring goods and connect local stores with nearby buyers for discounted, near-expiry, and surplus essentials.  
+> **Notice:** BYLOT DOES NOT USE ONLINE PAYMENT PROCESSING OR TELEGRAM INTEGRATION.
 
 ---
 

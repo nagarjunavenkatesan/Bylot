@@ -2,6 +2,8 @@
 
 This is a drop-in Kotlin + Jetpack Compose + Retrofit example for connecting an Android app to the same local Node.js/MySQL backend used by the website.
 
+> **Notice:** BYLOT DOES NOT USE ONLINE PAYMENT PROCESSING OR TELEGRAM INTEGRATION.
+
 Backend endpoint:
 
 ```http

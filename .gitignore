@@ -23,4 +23,8 @@ certs/
 **/certs/
 *.pem
 *.key
-
+backups/
+**/backups/
+*.sql.gz
+.gradle/
+**/.gradle/
