@@ -54,10 +54,14 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-Bylot <no-reply@bylot.in>}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      REPORT_PERIOD_DAYS: ${REPORT_PERIOD_DAYS:-30}
+      ARCHIVE_RETENTION_DAYS: ${ARCHIVE_RETENTION_DAYS:-365}
+      REPORT_ENCRYPTION_KEY: ${REPORT_ENCRYPTION_KEY:-}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
       SKIP_SMTP_CHECK: ${SKIP_SMTP_CHECK:-false}
     volumes:
       - uploads_data:/app/uploads
+      - reports_data:/app/private/reports
       - frontend_dist:/bylot/dist:ro
     networks:
       - bylot-network
@@ -92,6 +96,8 @@ volumes:
   mysql_data:
     driver: local
   uploads_data:
+    driver: local
+  reports_data:
     driver: local
   frontend_dist:
     driver: local

@@ -137,5 +137,8 @@ module.exports = {
     pass: process.env.SMTP_PASS,
     from: process.env.EMAIL_FROM || "Bylot <no-reply@bylot.in>"
   },
-  adminEmail: process.env.ADMIN_EMAIL || ""
+  adminEmail: process.env.ADMIN_EMAIL || "",
+  reportPeriodDays: Number(process.env.REPORT_PERIOD_DAYS || 30),
+  archiveRetentionDays: Number(process.env.ARCHIVE_RETENTION_DAYS || 365),
+  reportEncryptionKey: process.env.REPORT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY || ""
 };

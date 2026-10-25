@@ -35,6 +35,48 @@ const deleteSelectedExpired = [
     .withMessage("Each product ID must be a positive integer")
 ];
 
+const verifyLogin2FA = [
+  body("challengeId").isString().isLength({ min: 16, max: 64 }).withMessage("Valid challengeId is required"),
+  body().custom((value, { req }) => {
+    const raw = req.body.code !== undefined ? req.body.code : req.body.totpCode;
+    if (raw === undefined || raw === null || !/^\d{6}$/.test(String(raw).trim())) {
+      throw new Error("6-digit verification code is required");
+    }
+    return true;
+  })
+];
+
+const verifySetup2FA = [
+  body("challengeId").isString().isLength({ min: 16, max: 64 }).withMessage("Valid challengeId is required"),
+  body().custom((value, { req }) => {
+    const raw = req.body.code !== undefined ? req.body.code : req.body.totpCode;
+    if (raw === undefined || raw === null || !/^\d{6}$/.test(String(raw).trim())) {
+      throw new Error("6-digit verification code is required");
+    }
+    return true;
+  })
+];
+
+const recovery2FA = [
+  body("challengeId").isString().isLength({ min: 16, max: 64 }).withMessage("Valid challengeId is required"),
+  body().custom((value, { req }) => {
+    const raw = req.body.recoveryCode !== undefined ? req.body.recoveryCode : req.body.code;
+    if (!raw || typeof raw !== "string" || raw.trim().length < 6 || raw.trim().length > 40) {
+      throw new Error("Valid recovery code is required");
+    }
+    return true;
+  })
+];
+
+const disable2FA = [
+  body("currentTotp").isString().trim().matches(/^\d{6}$/).withMessage("Current 6-digit TOTP code is required for verification"),
+  body("password").isString().notEmpty().withMessage("Current admin password is required")
+];
+
+const regenerateRecovery = [
+  body("currentTotp").isString().trim().matches(/^\d{6}$/).withMessage("Current 6-digit TOTP code is required for verification")
+];
+
 module.exports = {
   login,
   idParam,
@@ -42,5 +84,10 @@ module.exports = {
   blockUser,
   productStatus,
   resolveReport,
-  deleteSelectedExpired
+  deleteSelectedExpired,
+  verifyLogin2FA,
+  verifySetup2FA,
+  recovery2FA,
+  disable2FA,
+  regenerateRecovery
 };

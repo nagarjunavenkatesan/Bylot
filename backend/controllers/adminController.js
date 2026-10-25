@@ -9,16 +9,71 @@ const { issueTokens } = require("./authController");
 const { clearHotCache } = require("./productController");
 const { deleteUploadedFile } = require("../middleware/uploadMiddleware");
 const auditLogger = require("../security/auditLogger");
+const twoFactorService = require("../services/twoFactorService");
+const cryptoUtil = require("../security/cryptoUtil");
+const accountLockout = require("../security/accountLockout");
+const { normalizeEmail } = require("../utils/email");
+
+const DUMMY_HASH = "$2b$12$e80yvV8Q0qC82n04K71Q2uQnffc1GfG5ZcR2WvY3eK7jM9mO8oDqm";
+
+function getClientIp(req) {
+  return req.ip || req.connection?.remoteAddress || "127.0.0.1";
+}
 
 const adminLogin = asyncHandler(async (req, res) => {
-  const user = await findUserByEmail(req.body.email);
-  if (!user || user.role !== "admin" || user.status !== "active" || !(await comparePassword(req.body.password, user.password_hash))) {
+  const email = normalizeEmail(req.body.email);
+  const { password } = req.body;
+  const clientIp = getClientIp(req);
+
+  const lockState = accountLockout.isLocked(email, clientIp, req);
+  if (lockState.locked) {
+    throw new AppError(
+      `Account temporarily locked due to excessive failed attempts. Try again in ${lockState.remainingSeconds} seconds.`,
+      429
+    );
+  }
+
+  const user = await findUserByEmail(email);
+  const candidateHash = user && user.password_hash ? user.password_hash : DUMMY_HASH;
+  const passwordMatch = await comparePassword(password, candidateHash);
+
+  if (!user || user.role !== "admin" || !passwordMatch) {
+    accountLockout.recordFailure(email, clientIp, req);
     throw new AppError("Invalid email or password. Please try again.", 401);
   }
 
-  const publicUser = await findUserById(user.id);
-  const data = await issueTokens(publicUser, req, res);
-  return success(res, "Admin login successful", data);
+  if (user.status !== "active") {
+    throw new AppError("Your account is not active. Please contact support.", 401);
+  }
+
+  accountLockout.recordSuccess(email, clientIp, req);
+
+  const admin2fa = await twoFactorService.getAdmin2FARecord(user.id);
+  if (admin2fa && admin2fa.enabled) {
+    const challenge = await twoFactorService.createChallenge(user.id, "login");
+    return success(res, "Two-step verification required", {
+      requires2FA: true,
+      challengeId: challenge.challengeId,
+      expiresIn: challenge.expiresIn
+    });
+  } else {
+    const secret = twoFactorService.generateTotpSecret();
+    const uri = twoFactorService.generateProvisioningUri(user.email, secret);
+    const qrCodeUrl = await twoFactorService.generateQrCode(uri);
+    const challenge = await twoFactorService.createChallenge(user.id, "setup", secret);
+    auditLogger.logEvent("ADMIN_2FA_ENROLL_STARTED", req, {
+      userId: user.id,
+      details: "Admin started first-time 2FA enrollment"
+    });
+    return success(res, "Two-step verification setup required", {
+      requires2FASetup: true,
+      challengeId: challenge.challengeId,
+      qrCodeUrl,
+      manualKey: secret,
+      provisioningUri: uri,
+      expiresIn: challenge.expiresIn
+    });
+  }
 });
 
 const getAllUsers = asyncHandler(async (req, res) => {
@@ -541,8 +596,253 @@ const searchProductByItemId = asyncHandler(async (req, res) => {
   return success(res, "Product found", products[0]);
 });
 
+// ── Admin 2FA Management Endpoints ──────────────────────────────────────────
+
+const verifyLogin2FA = asyncHandler(async (req, res) => {
+  const { challengeId } = req.body;
+  const totpCode = req.body.code !== undefined ? req.body.code : req.body.totpCode;
+  const challenge = await twoFactorService.getChallenge(challengeId, "login");
+  if (!challenge) {
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      details: "Attempted verification on invalid or expired challenge"
+    });
+    throw new AppError("Invalid or expired authentication code.", 401);
+  }
+
+  const admin2fa = await twoFactorService.getAdmin2FARecord(challenge.admin_user_id);
+  if (!admin2fa || !admin2fa.enabled) {
+    await twoFactorService.deleteChallenge(challengeId);
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      userId: challenge.admin_user_id,
+      details: "2FA not enabled for administrator challenge"
+    });
+    throw new AppError("Invalid verification code. Please try again.", 401);
+  }
+
+  const secret = cryptoUtil.decryptPII(admin2fa.secret_encrypted);
+  const result = twoFactorService.verifyTotp(secret, totpCode, admin2fa.last_used_time_step);
+
+  if (!result.valid) {
+    const failure = await twoFactorService.recordChallengeFailure(challengeId, req);
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      userId: challenge.admin_user_id,
+      details: result.reason === "REPLAY_DETECTED" ? "Replay of TOTP code detected" : "Invalid TOTP code provided"
+    });
+    if (failure.invalidated) {
+      throw new AppError("Too many failed attempts. Authentication challenge invalidated. Please sign in again.", 401);
+    }
+    throw new AppError("Invalid verification code. Please try again.", 401);
+  }
+
+  // Update last_used_time_step to prevent replay attacks
+  await twoFactorService.updateLastUsedTimeStep(challenge.admin_user_id, result.timeStep);
+  await twoFactorService.deleteChallenge(challengeId);
+
+  const user = await findUserById(challenge.admin_user_id);
+  if (!user || user.status !== "active" || user.role !== "admin") {
+    throw new AppError("User account not found or inactive.", 401);
+  }
+
+  await pool.execute("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
+  const data = await issueTokens(user, req, res);
+
+  auditLogger.logEvent("ADMIN_2FA_LOGIN_SUCCESS", req, {
+    userId: user.id,
+    details: "Admin successfully completed two-step verification"
+  });
+
+  return success(res, "Admin login successful", data);
+});
+
+const verifySetup2FA = asyncHandler(async (req, res) => {
+  const { challengeId } = req.body;
+  const totpCode = req.body.code !== undefined ? req.body.code : req.body.totpCode;
+  const challenge = await twoFactorService.getChallenge(challengeId, "setup");
+  if (!challenge || !challenge.temp_secret_encrypted) {
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      details: "Attempted setup verification on invalid or expired setup challenge"
+    });
+    throw new AppError("Invalid or expired setup session. Please sign in again.", 401);
+  }
+
+  const tempSecret = cryptoUtil.decryptPII(challenge.temp_secret_encrypted);
+  const result = twoFactorService.verifyTotp(tempSecret, totpCode);
+
+  if (!result.valid) {
+    const failure = await twoFactorService.recordChallengeFailure(challengeId, req);
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      userId: challenge.admin_user_id,
+      details: "Invalid code provided during 2FA setup enrollment"
+    });
+    if (failure.invalidated) {
+      throw new AppError("Too many failed attempts. Setup session invalidated. Please sign in again.", 401);
+    }
+    throw new AppError("Invalid authentication code. Please check your authenticator app and try again.", 400);
+  }
+
+  const { recoveryCodes } = await twoFactorService.enableAdmin2FA(challenge.admin_user_id, tempSecret, result.timeStep);
+  await twoFactorService.deleteChallenge(challengeId);
+
+  const user = await findUserById(challenge.admin_user_id);
+  if (!user || user.status !== "active" || user.role !== "admin") {
+    throw new AppError("User account not found or inactive.", 401);
+  }
+
+  await pool.execute("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
+  const data = await issueTokens(user, req, res);
+
+  auditLogger.logEvent("ADMIN_2FA_ENABLED", req, {
+    userId: user.id,
+    details: "Admin successfully enabled two-step verification and generated recovery codes"
+  });
+
+  return success(res, "Two-step verification enabled successfully", {
+    ...data,
+    recoveryCodes // Displayed ONLY ONCE to administrator
+  });
+});
+
+const recoveryLogin2FA = asyncHandler(async (req, res) => {
+  const { challengeId } = req.body;
+  const recoveryCode = req.body.recoveryCode !== undefined ? req.body.recoveryCode : req.body.code;
+  const challenge = await twoFactorService.getChallenge(challengeId, "login");
+  if (!challenge) {
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      details: "Attempted recovery code verification on invalid or expired challenge"
+    });
+    throw new AppError("Invalid or expired authentication code.", 401);
+  }
+
+  const valid = await twoFactorService.verifyAndConsumeRecoveryCode(challenge.admin_user_id, recoveryCode);
+  if (!valid) {
+    const failure = await twoFactorService.recordChallengeFailure(challengeId, req);
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      userId: challenge.admin_user_id,
+      details: "Invalid or already used recovery code"
+    });
+    if (failure.invalidated) {
+      throw new AppError("Too many failed attempts. Authentication challenge invalidated. Please sign in again.", 401);
+    }
+    throw new AppError("Invalid verification code. Please try again.", 401);
+  }
+
+  await twoFactorService.deleteChallenge(challengeId);
+
+  const user = await findUserById(challenge.admin_user_id);
+  if (!user || user.status !== "active" || user.role !== "admin") {
+    throw new AppError("User account not found or inactive.", 401);
+  }
+
+  await pool.execute("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
+  const data = await issueTokens(user, req, res);
+
+  auditLogger.logEvent("ADMIN_2FA_RECOVERY_USED", req, {
+    severity: "HIGH",
+    userId: user.id,
+    details: "Admin successfully authenticated using a one-time recovery code"
+  });
+
+  return success(res, "Recovery code verified successfully", data);
+});
+
+const get2FAStatus = asyncHandler(async (req, res) => {
+  const status = await twoFactorService.getAdmin2FAStatus(req.user.id);
+  return success(res, "2FA status fetched successfully", status);
+});
+
+const initiate2FASetup = asyncHandler(async (req, res) => {
+  const secret = twoFactorService.generateTotpSecret();
+  const uri = twoFactorService.generateProvisioningUri(req.user.email, secret);
+  const qrCodeUrl = await twoFactorService.generateQrCode(uri);
+  const challenge = await twoFactorService.createChallenge(req.user.id, "setup", secret);
+
+  auditLogger.logEvent("ADMIN_2FA_ENROLL_STARTED", req, {
+    userId: req.user.id,
+    details: "Admin initiated 2FA setup from settings dashboard"
+  });
+
+  return success(res, "2FA setup initiated successfully", {
+    challengeId: challenge.challengeId,
+    qrCodeUrl,
+    manualKey: secret,
+    provisioningUri: uri,
+    expiresIn: challenge.expiresIn
+  });
+});
+
+const regenerateRecoveryCodes = asyncHandler(async (req, res) => {
+  const { currentTotp } = req.body;
+  const admin2fa = await twoFactorService.getAdmin2FARecord(req.user.id);
+  if (!admin2fa || !admin2fa.enabled) {
+    throw new AppError("Two-step verification is not enabled.", 400);
+  }
+
+  const secret = cryptoUtil.decryptPII(admin2fa.secret_encrypted);
+  const verifyResult = twoFactorService.verifyTotp(secret, currentTotp);
+  if (!verifyResult.valid) {
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      userId: req.user.id,
+      details: "Failed TOTP verification during recovery code regeneration"
+    });
+    throw new AppError("Invalid authentication code.", 401);
+  }
+
+  const { recoveryCodes } = await twoFactorService.regenerateRecoveryCodes(req.user.id);
+
+  auditLogger.logEvent("ADMIN_2FA_RECOVERY_CODES_REGENERATED", req, {
+    userId: req.user.id,
+    details: "Admin regenerated 2FA recovery codes"
+  });
+
+  return success(res, "Recovery codes regenerated successfully", { recoveryCodes });
+});
+
+const disable2FA = asyncHandler(async (req, res) => {
+  const { currentTotp, password } = req.body;
+  const admin2fa = await twoFactorService.getAdmin2FARecord(req.user.id);
+  if (!admin2fa || !admin2fa.enabled) {
+    throw new AppError("Two-step verification is not enabled.", 400);
+  }
+
+  if (!password) {
+    throw new AppError("Current admin password is required to disable 2FA.", 401);
+  }
+
+  const [rows] = await pool.execute("SELECT password_hash FROM users WHERE id = ? LIMIT 1", [req.user.id]);
+  if (!rows[0] || !(await comparePassword(password, rows[0].password_hash))) {
+    throw new AppError("Invalid password.", 401);
+  }
+
+  const secret = cryptoUtil.decryptPII(admin2fa.secret_encrypted);
+  const verifyResult = twoFactorService.verifyTotp(secret, currentTotp);
+  if (!verifyResult.valid) {
+    auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
+      userId: req.user.id,
+      details: "Failed TOTP verification during 2FA disable attempt"
+    });
+    throw new AppError("Invalid authentication code.", 401);
+  }
+
+  await twoFactorService.disableAdmin2FA(req.user.id);
+
+  auditLogger.logEvent("ADMIN_2FA_DISABLED", req, {
+    severity: "HIGH",
+    userId: req.user.id,
+    details: "Admin disabled two-step verification"
+  });
+
+  return success(res, "Two-step verification has been disabled successfully.", null);
+});
+
 module.exports = {
   adminLogin,
+  verifyLogin2FA,
+  verifySetup2FA,
+  recoveryLogin2FA,
+  get2FAStatus,
+  initiate2FASetup,
+  regenerateRecoveryCodes,
+  disable2FA,
   getAllUsers,
   getSellers,
   approveSeller,

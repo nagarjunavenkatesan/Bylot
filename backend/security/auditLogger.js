@@ -31,6 +31,30 @@ class AuditLogger {
     }
   }
 
+  sanitizeLogData(data) {
+    if (!data || typeof data !== "object") return data;
+    const SENSITIVE_KEYS = [
+      "password", "secret", "totp", "totpcode", "code", "recoverycode",
+      "jwt", "token", "refreshtoken", "accesstoken", "authorization",
+      "secret_encrypted", "secretencrypted", "key"
+    ];
+    if (Array.isArray(data)) {
+      return data.map(item => this.sanitizeLogData(item));
+    }
+    const sanitized = {};
+    for (const [k, v] of Object.entries(data)) {
+      const lower = k.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (SENSITIVE_KEYS.some(sk => lower.includes(sk))) {
+        sanitized[k] = "[REDACTED]";
+      } else if (typeof v === "object" && v !== null) {
+        sanitized[k] = this.sanitizeLogData(v);
+      } else {
+        sanitized[k] = v;
+      }
+    }
+    return sanitized;
+  }
+
   logEvent(type, req = null, metadata = {}) {
     const timestamp = new Date().toISOString();
     const ip = req
@@ -42,6 +66,9 @@ class AuditLogger {
     const method = req?.method || metadata.method || "N/A";
     const userId = req?.user?.id || metadata.userId || null;
 
+    const safeDetails = typeof metadata.details === "string" ? metadata.details : JSON.stringify(this.sanitizeLogData(metadata.details || {}));
+    const safeExtra = this.sanitizeLogData(metadata.extra || {});
+
     const entry = {
       id: `sec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       timestamp,
@@ -52,8 +79,8 @@ class AuditLogger {
       path: pathName,
       userId,
       userAgent: userAgent.slice(0, 150),
-      details: metadata.details || "",
-      extra: metadata.extra || {}
+      details: safeDetails,
+      extra: safeExtra
     };
 
     this.inMemoryLogs.push(entry);
@@ -82,14 +109,27 @@ class AuditLogger {
       case "FILE_MALWARE_SUSPECT":
         return "CRITICAL";
       case "AUTH_FAILURE":
+      case "ADMIN_2FA_LOGIN_FAILED":
+      case "ADMIN_2FA_RECOVERY_USED":
+      case "ADMIN_2FA_DISABLED":
       case "CSRF_MISMATCH":
       case "RATE_LIMIT_EXCEEDED":
       case "TOKEN_REVOKED_USAGE":
       case "SUSPICIOUS_PAYLOAD":
+      case "REPORT_GENERATION_FAILED":
         return "HIGH";
       case "ACCOUNT_LOCKED":
       case "IP_BLOCKED":
+      case "REPORT_DELETE":
         return "MEDIUM";
+      case "ADMIN_2FA_ENROLL_STARTED":
+      case "ADMIN_2FA_ENABLED":
+      case "ADMIN_2FA_LOGIN_SUCCESS":
+      case "ADMIN_2FA_RECOVERY_CODES_REGENERATED":
+      case "REPORT_CREATED":
+      case "REPORT_DOWNLOAD":
+      case "REPORT_AUTO_EXPIRED":
+        return "INFO";
       default:
         return "INFO";
     }

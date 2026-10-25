@@ -27,6 +27,8 @@ const {
 
 const accountLockout = require("../security/accountLockout");
 const tokenBlacklist = require("../security/tokenBlacklist");
+const auditLogger = require("../security/auditLogger");
+const twoFactorService = require("../services/twoFactorService");
 
 // Constant dummy bcrypt hash for timing attack mitigation on unknown email
 const DUMMY_HASH = "$2b$12$e80yvV8Q0qC82n04K71Q2uQnffc1GfG5ZcR2WvY3eK7jM9mO8oDqm";
@@ -214,6 +216,36 @@ const login = asyncHandler(async (req, res) => {
 
   accountLockout.recordSuccess(email, clientIp, req);
 
+  // Mandatory 2FA for Administrator accounts
+  if (user.role === "admin") {
+    const admin2fa = await twoFactorService.getAdmin2FARecord(user.id);
+    if (admin2fa && admin2fa.enabled) {
+      const challenge = await twoFactorService.createChallenge(user.id, "login");
+      return success(res, "Two-step verification required", {
+        requires2FA: true,
+        challengeId: challenge.challengeId,
+        expiresIn: challenge.expiresIn
+      });
+    } else {
+      const secret = twoFactorService.generateTotpSecret();
+      const uri = twoFactorService.generateProvisioningUri(user.email, secret);
+      const qrCodeUrl = await twoFactorService.generateQrCode(uri);
+      const challenge = await twoFactorService.createChallenge(user.id, "setup", secret);
+      auditLogger.logEvent("ADMIN_2FA_ENROLL_STARTED", req, {
+        userId: user.id,
+        details: "Admin started first-time 2FA enrollment via login"
+      });
+      return success(res, "Two-step verification setup required", {
+        requires2FASetup: true,
+        challengeId: challenge.challengeId,
+        qrCodeUrl,
+        manualKey: secret,
+        provisioningUri: uri,
+        expiresIn: challenge.expiresIn
+      });
+    }
+  }
+
   await pool.execute("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
   const publicUser = await findUserById(user.id);
   const data = await issueTokens(publicUser, req, res);
@@ -261,6 +293,36 @@ const googleLogin = asyncHandler(async (req, res) => {
     );
 
     user = await findUserById(user.id);
+  }
+
+  // Mandatory 2FA for Administrator accounts logging in via Google OAuth
+  if (user.role === "admin") {
+    const admin2fa = await twoFactorService.getAdmin2FARecord(user.id);
+    if (admin2fa && admin2fa.enabled) {
+      const challenge = await twoFactorService.createChallenge(user.id, "login");
+      return success(res, "Two-step verification required", {
+        requires2FA: true,
+        challengeId: challenge.challengeId,
+        expiresIn: challenge.expiresIn
+      });
+    } else {
+      const secret = twoFactorService.generateTotpSecret();
+      const uri = twoFactorService.generateProvisioningUri(user.email, secret);
+      const qrCodeUrl = await twoFactorService.generateQrCode(uri);
+      const challenge = await twoFactorService.createChallenge(user.id, "setup", secret);
+      auditLogger.logEvent("ADMIN_2FA_ENROLL_STARTED", req, {
+        userId: user.id,
+        details: "Admin started first-time 2FA enrollment via Google OAuth"
+      });
+      return success(res, "Two-step verification setup required", {
+        requires2FASetup: true,
+        challengeId: challenge.challengeId,
+        qrCodeUrl,
+        manualKey: secret,
+        provisioningUri: uri,
+        expiresIn: challenge.expiresIn
+      });
+    }
   }
 
   const data = await issueTokens(user, req, res);

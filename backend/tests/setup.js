@@ -12,7 +12,7 @@ if (!currentDb.endsWith("_test")) {
   process.exit(1);
 }
 
-async function createTestUser({ email, role = "customer", status = "active", emailVerified = true, password = "Password@123!" }) {
+async function createTestUser({ email, role = "customer", status = "active", emailVerified = true, password = "Password@123!", enable2FA = true }) {
   const passwordHash = await hashPassword(password);
   const [res] = await pool.execute(
     `INSERT INTO users (name, email, password_hash, role, status, email_verified_at, token_version)
@@ -27,7 +27,20 @@ async function createTestUser({ email, role = "customer", status = "active", ema
     ]
   );
   const [rows] = await pool.execute("SELECT * FROM users WHERE id = ?", [res.insertId]);
-  return rows[0];
+  const user = rows[0];
+
+  if (role === "admin" && enable2FA) {
+    const { encryptPII } = require("../security/cryptoUtil");
+    const fakeSecretEncrypted = encryptPII("JBSWY3DPEHPK3PXP");
+    await pool.execute(
+      `INSERT INTO admin_2fa (admin_user_id, secret_encrypted, enabled)
+       VALUES (?, ?, 1)
+       ON DUPLICATE KEY UPDATE enabled = 1`,
+      [user.id, fakeSecretEncrypted]
+    );
+  }
+
+  return user;
 }
 
 async function createTestSeller({ user, approvalStatus = "approved", status = "active" }) {
@@ -70,6 +83,9 @@ async function cleanTestData(emails = [], productIds = [], orderIds = [], seller
   }
   if (emails.length > 0) {
     const ph = emails.map(() => "?").join(",");
+    await pool.execute(`DELETE FROM admin_2fa_recovery_codes WHERE admin_user_id IN (SELECT id FROM users WHERE email IN (${ph}))`, emails);
+    await pool.execute(`DELETE FROM admin_2fa_challenges WHERE admin_user_id IN (SELECT id FROM users WHERE email IN (${ph}))`, emails);
+    await pool.execute(`DELETE FROM admin_2fa WHERE admin_user_id IN (SELECT id FROM users WHERE email IN (${ph}))`, emails);
     await pool.execute(`DELETE FROM refresh_tokens WHERE user_id IN (SELECT id FROM users WHERE email IN (${ph}))`, emails);
     await pool.execute(`DELETE FROM users WHERE email IN (${ph})`, emails);
   }

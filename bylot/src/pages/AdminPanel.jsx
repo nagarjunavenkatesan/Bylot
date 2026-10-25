@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FaBoxOpen, FaCalendarTimes, FaChartLine, FaCheckCircle, FaChevronLeft, FaChevronRight, FaExclamationTriangle, FaEye, FaEyeSlash, FaFlag, FaLock, FaMapMarkedAlt, FaSearch, FaStore, FaThLarge, FaThList, FaTrash, FaUsers, FaUserShield } from 'react-icons/fa';
+import { FaArchive, FaBoxOpen, FaCalendarTimes, FaChartLine, FaCheckCircle, FaChevronLeft, FaChevronRight, FaExclamationTriangle, FaEye, FaEyeSlash, FaFlag, FaLock, FaMapMarkedAlt, FaSearch, FaStore, FaThLarge, FaThList, FaTrash, FaUsers, FaUserShield } from 'react-icons/fa';
 import PageTransition from '../components/PageTransition';
 import SEOHead from '../components/SEOHead';
 import { pageSEO } from '../utils/seo';
 import DistrictAnalytics from '../components/DistrictAnalytics';
 import SecurityMcpDashboard from '../components/SecurityMcpDashboard';
 import ProductCard from '../components/ProductCard';
+import TwoFactorAuthFlow from '../components/TwoFactorAuthFlow';
+import AdminReportsTab from '../components/AdminReportsTab';
 import { API_BASE_URL, getAccessToken, normalizeProduct, setAccessToken } from '../api/backendApi';
 import { formatCardExpiry } from '../utils/expiry';
 import { useAuth } from '../context/AuthContext';
@@ -25,7 +27,8 @@ const tabs = [
     { id: 'sellers',   label: 'Sellers',   icon: FaStore },
     { id: 'products',  label: 'Products',  icon: FaBoxOpen },
     { id: 'expired',   label: 'Expired Products', icon: FaCalendarTimes },
-    { id: 'reports',   label: 'Reports',   icon: FaFlag },
+    { id: 'reports',   label: 'Disputes',   icon: FaFlag },
+    { id: 'archives',  label: 'Reports & Archives', icon: FaArchive },
     { id: 'security',  label: 'Security & MCP', icon: FaUserShield },
 ];
 
@@ -60,6 +63,7 @@ const AdminPanel = () => {
     const [email, setEmail]           = useState('');
     const [password, setPassword]     = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [twoFactorChallenge, setTwoFactorChallenge] = useState(null);
     const [activeTab, setActiveTab]   = useState('overview');
     const [query, setQuery]           = useState('');
     const [productIdSearch, setProductIdSearch] = useState('');
@@ -148,16 +152,33 @@ const AdminPanel = () => {
         e.preventDefault();
         setLoading(true); setError(''); setMessage('');
         try {
-            const payload = await adminRequest('/api/admin/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-            const token = payload?.data?.accessToken || payload?.accessToken;
+            const res = await adminRequest('/api/admin/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+            const payload = res?.data || res;
+            if (payload?.requires2FA || payload?.requires2FASetup) {
+                setTwoFactorChallenge(payload);
+                return;
+            }
+            const token = payload?.accessToken;
             if (token) {
                 setAccessToken(token);
             }
-            login({ ...(payload?.data?.user || payload?.user || {}), accessToken: token });
+            login({ ...(payload?.user || {}), accessToken: token });
             setPassword('');
             setMessage('Admin login successful.');
         } catch (err) { setError(err.message); }
         finally { setLoading(false); }
+    };
+
+    const handleTwoFactorSuccess = (authPayload) => {
+        const payload = authPayload?.data || authPayload;
+        const token = payload?.accessToken;
+        if (token) {
+            setAccessToken(token);
+        }
+        login({ ...(payload?.user || {}), accessToken: token });
+        setTwoFactorChallenge(null);
+        setPassword('');
+        setMessage('Admin login successful.');
     };
 
     const runAction = async (action, successText) => {
@@ -214,6 +235,21 @@ const AdminPanel = () => {
     ];
 
     if (!isAdmin) {
+        if (twoFactorChallenge) {
+            return (
+                <PageTransition>
+                    <SEOHead {...adminSEO} />
+                    <section className="admin-login-page">
+                        <TwoFactorAuthFlow
+                            challengeData={twoFactorChallenge}
+                            onSuccess={handleTwoFactorSuccess}
+                            onCancel={() => setTwoFactorChallenge(null)}
+                        />
+                    </section>
+                </PageTransition>
+            );
+        }
+
         return (
             <PageTransition>
                 <SEOHead {...adminSEO} />
@@ -298,8 +334,9 @@ const AdminPanel = () => {
 
                     {activeTab === 'districts' && <DistrictAnalytics rows={districtStats} totals={districtTotals} loading={loading} />}
                     {activeTab === 'security' && <SecurityMcpDashboard />}
+                    {activeTab === 'archives' && <AdminReportsTab adminRequest={adminRequest} />}
 
-                    {!['overview', 'districts', 'reports', 'security', 'expired'].includes(activeTab) && (
+                    {!['overview', 'districts', 'reports', 'security', 'expired', 'archives'].includes(activeTab) && (
                         <AdminSearch activeTab={activeTab} query={query} setQuery={setQuery} />
                     )}
 
@@ -902,32 +939,34 @@ function ExpiredProductsTab({ adminRequest, authoritativeExpiredCount, setAuthor
                         });
 
                         return (
-                            <div key={item.id} className={`admin-expired-card-item ${isSelected ? 'is-selected' : ''}`}>
-                                <div className="admin-card-select-bar">
-                                    <label className="admin-card-select-label">
-                                        <input
-                                            type="checkbox"
-                                            checked={isSelected}
-                                            onChange={() => toggleSelectProduct(item.id)}
-                                            aria-label={`Select ${item.name}`}
-                                        />
-                                        <span>{isSelected ? 'Selected' : 'Select'}</span>
-                                    </label>
-                                    <span className="admin-product-id" style={{ fontSize: '0.74rem' }}>
-                                        {item.product_item_id || `#${item.id}`}
-                                    </span>
-                                </div>
-                                <ProductCard
-                                    product={normalized}
-                                    isAdmin={true}
-                                    onAdminDelete={(id, name) => setModal({
-                                        open: true,
-                                        type: 'single',
-                                        singleId: id,
-                                        singleName: name || item.name
-                                    })}
-                                />
-                            </div>
+                            <ProductCard
+                                key={item.id}
+                                product={normalized}
+                                isAdmin={true}
+                                isSelected={isSelected}
+                                topHeader={
+                                    <div className="admin-card-top-header">
+                                        <label className="admin-card-select-label">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelectProduct(item.id)}
+                                                aria-label={`Select ${item.name}`}
+                                            />
+                                            <span>{isSelected ? 'Selected' : 'Select'}</span>
+                                        </label>
+                                        <span className="admin-product-id">
+                                            {item.product_item_id || `#${item.id}`}
+                                        </span>
+                                    </div>
+                                }
+                                onAdminDelete={(id, name) => setModal({
+                                    open: true,
+                                    type: 'single',
+                                    singleId: id,
+                                    singleName: name || item.name
+                                })}
+                            />
                         );
                     })}
                 </div>

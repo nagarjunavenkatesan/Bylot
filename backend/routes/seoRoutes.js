@@ -193,6 +193,8 @@ Disallow: /edit-item/
 Disallow: /admin
 Disallow: /seller/orders
 Disallow: /api/
+Disallow: /private/
+Disallow: /reports/
 Disallow: /uploads/
 Disallow: /_vite/
 Disallow: /*.map$

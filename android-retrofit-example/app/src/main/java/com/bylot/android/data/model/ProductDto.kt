@@ -23,14 +23,29 @@ data class ProductDto(
     @SerializedName("image_url")
     val imageUrl: String? = null,
     @SerializedName("image")
-    val rawImage: String? = null
+    val rawImage: String? = null,
+    @SerializedName("country")
+    val country: String? = null,
+    @SerializedName("state")
+    val state: String? = null,
+    @SerializedName("district")
+    val district: String? = null,
+    @SerializedName("city")
+    val city: String? = null,
+    @SerializedName("locality")
+    val locality: String? = null
 )
 
 data class Product(
     val id: Long,
     val name: String,
     val price: Double,
-    val imageUrl: String?
+    val imageUrl: String?,
+    val country: String? = null,
+    val state: String? = null,
+    val district: String? = null,
+    val city: String? = null,
+    val locality: String? = null
 )
 
 fun ProductDto.toDomain(baseUrl: String): Product {
@@ -45,6 +60,11 @@ fun ProductDto.toDomain(baseUrl: String): Product {
         id = id,
         name = name,
         price = sellingPrice ?: rawPrice ?: 0.0,
-        imageUrl = normalizedImageUrl
+        imageUrl = normalizedImageUrl,
+        country = country,
+        state = state,
+        district = district,
+        city = city,
+        locality = locality
     )
 }

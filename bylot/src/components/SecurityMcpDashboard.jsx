@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaShieldAlt, FaServer, FaLock, FaCheckCircle, FaExclamationTriangle, FaTerminal, FaSync, FaBan } from 'react-icons/fa';
 import { API_BASE_URL, getAccessToken } from '../api/backendApi';
+import AdminTwoFactorSettings from './AdminTwoFactorSettings';
 
 const SecurityMcpDashboard = () => {
     const [securityData, setSecurityData] = useState(null);
@@ -125,6 +126,9 @@ const SecurityMcpDashboard = () => {
                     <FaSync /> Refresh Status
                 </button>
             </div>
+
+            {/* Admin Two-Step Verification Section */}
+            <AdminTwoFactorSettings />
 
             {/* Metrics Overview Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>

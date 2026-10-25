@@ -4,7 +4,7 @@ import { FaCamera, FaFolderOpen, FaTimes, FaMapMarkerAlt, FaStore } from 'react-
 import PageTransition from '../components/PageTransition';
 import SEOHead from '../components/SEOHead';
 import { pageSEO } from '../utils/seo';
-import { apiRequest } from '../api/backendApi';
+import { apiRequest, API_BASE_URL } from '../api/backendApi';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Sell.css';
 
@@ -15,6 +15,26 @@ const sellSEO = pageSEO({
     keywords: 'sell surplus groceries, sell near expiry items, local business surplus marketplace',
 });
 
+const ALL_STATES_FALLBACK = [
+    { code: 'AP', name: 'Andhra Pradesh' }, { code: 'AR', name: 'Arunachal Pradesh' },
+    { code: 'AS', name: 'Assam' }, { code: 'BR', name: 'Bihar' },
+    { code: 'CG', name: 'Chhattisgarh' }, { code: 'GA', name: 'Goa' },
+    { code: 'GJ', name: 'Gujarat' }, { code: 'HR', name: 'Haryana' },
+    { code: 'HP', name: 'Himachal Pradesh' }, { code: 'JH', name: 'Jharkhand' },
+    { code: 'KA', name: 'Karnataka' }, { code: 'KL', name: 'Kerala' },
+    { code: 'MP', name: 'Madhya Pradesh' }, { code: 'MH', name: 'Maharashtra' },
+    { code: 'MN', name: 'Manipur' }, { code: 'ML', name: 'Meghalaya' },
+    { code: 'MZ', name: 'Mizoram' }, { code: 'NL', name: 'Nagaland' },
+    { code: 'OD', name: 'Odisha' }, { code: 'PB', name: 'Punjab' },
+    { code: 'RJ', name: 'Rajasthan' }, { code: 'SK', name: 'Sikkim' },
+    { code: 'TN', name: 'Tamil Nadu' }, { code: 'TS', name: 'Telangana' },
+    { code: 'TR', name: 'Tripura' }, { code: 'UP', name: 'Uttar Pradesh' },
+    { code: 'UK', name: 'Uttarakhand' }, { code: 'WB', name: 'West Bengal' },
+    { code: 'AN', name: 'Andaman and Nicobar Islands' }, { code: 'CH', name: 'Chandigarh' },
+    { code: 'DN', name: 'Dadra and Nagar Haveli and Daman and Diu' }, { code: 'DL', name: 'Delhi' },
+    { code: 'JK', name: 'Jammu and Kashmir' }, { code: 'LA', name: 'Ladakh' },
+    { code: 'LD', name: 'Lakshadweep' }, { code: 'PY', name: 'Puducherry' }
+];
 
 const DISTRICTS = [
     'Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli',
@@ -29,7 +49,7 @@ const CATEGORIES = ['Vegetables', 'Fruits', 'Dairy', 'Bakery', 'Daily Essentials
 const initialForm = {
     name: '', description: '', price: '', originalPrice: '',
     expiryDate: '', location: '', latitude: null, longitude: null,
-    category: 'Vegetables', district: 'Chennai',
+    category: 'Vegetables', country: 'India', state: 'Tamil Nadu', district: 'Chennai', locality: '',
     stockQuantity: '1', image: null, imagePreview: null,
 };
 
@@ -46,6 +66,36 @@ export default function Sell() {
     const [showPhoneModal, setShowPhoneModal] = useState(false);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [showImagePicker, setShowImagePicker] = useState(false);
+    const [statesList, setStatesList] = useState(ALL_STATES_FALLBACK);
+    const [districtsList, setDistrictsList] = useState(DISTRICTS);
+
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/locations/states`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.data?.regions) {
+                    setStatesList(data.data.regions);
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    const handleStateChange = async (e) => {
+        const selectedState = e.target.value;
+        set('state', selectedState);
+        const found = statesList.find(s => s.name === selectedState);
+        const code = found?.code || selectedState;
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/locations/states/${encodeURIComponent(code)}/districts`);
+            const data = await res.json();
+            if (data.success && data.data?.districts?.length > 0) {
+                setDistrictsList(data.data.districts);
+                set('district', data.data.districts[0]);
+            }
+        } catch {
+            // keep current districts fallback
+        }
+    };
 
     useEffect(() => {
         if (authLoading) return;
@@ -120,7 +170,10 @@ export default function Sell() {
             data.append('expiryDate', form.expiryDate);
             data.append('category', form.category);
             data.append('categoryId', form.category === 'Dairy' ? 4 : form.category === 'Vegetables' ? 5 : form.category === 'Fruits' ? 6 : form.category === 'Bakery' ? 7 : 1);
-            data.append('district', form.district);
+            data.append('country', 'India');
+            data.append('state', form.state || 'Tamil Nadu');
+            data.append('district', form.district || 'Chennai');
+            if (form.locality) data.append('locality', form.locality.trim());
             data.append('stockQuantity', form.stockQuantity || '1');
             data.append('location', form.location.trim());
             if (form.latitude)  data.append('latitude',  form.latitude);
@@ -196,22 +249,75 @@ export default function Sell() {
                             />
                         </div>
 
-                        {/* Category + District */}
+                        {/* Canonical India Location Hierarchy */}
                         <div className="sell-row">
                             <div className="sell-field">
-                                <label className="sell-label" htmlFor="category">Category <span className="sell-required">*</span></label>
-                                <select id="category" name="category" className="sell-input sell-select"
-                                    value={form.category} onChange={handleChange}>
-                                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                <label className="sell-label" htmlFor="country">Country</label>
+                                <input
+                                    id="country"
+                                    name="country"
+                                    type="text"
+                                    className="sell-input"
+                                    value="India"
+                                    readOnly
+                                    disabled
+                                />
+                            </div>
+                            <div className="sell-field">
+                                <label className="sell-label" htmlFor="state">State / Union Territory <span className="sell-required">*</span></label>
+                                <select
+                                    id="state"
+                                    name="state"
+                                    className="sell-input sell-select"
+                                    value={form.state}
+                                    onChange={handleStateChange}
+                                    required
+                                >
+                                    {statesList.map(s => <option key={s.code || s.name} value={s.name}>{s.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="sell-row">
+                            <div className="sell-field">
+                                <label className="sell-label" htmlFor="district">District / City <span className="sell-required">*</span></label>
+                                <select
+                                    id="district"
+                                    name="district"
+                                    className="sell-input sell-select"
+                                    value={form.district}
+                                    onChange={handleChange}
+                                    required
+                                >
+                                    {districtsList.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                             </div>
                             <div className="sell-field">
-                                <label className="sell-label" htmlFor="district">District <span className="sell-required">*</span></label>
-                                <select id="district" name="district" className="sell-input sell-select"
-                                    value={form.district} onChange={handleChange} required>
-                                    {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
+                                <label className="sell-label" htmlFor="locality">Locality / Area</label>
+                                <input
+                                    id="locality"
+                                    name="locality"
+                                    type="text"
+                                    className="sell-input"
+                                    value={form.locality}
+                                    onChange={handleChange}
+                                    placeholder="e.g. T Nagar, Indiranagar, Connaught Place"
+                                />
                             </div>
+                        </div>
+
+                        {/* Category */}
+                        <div className="sell-field">
+                            <label className="sell-label" htmlFor="category">Category <span className="sell-required">*</span></label>
+                            <select
+                                id="category"
+                                name="category"
+                                className="sell-input sell-select"
+                                value={form.category}
+                                onChange={handleChange}
+                            >
+                                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
                         </div>
 
                         {/* Prices */}

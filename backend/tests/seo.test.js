@@ -10,6 +10,8 @@ describe("SEO & SPA 404 Route Handling Integration Tests", () => {
       expect(res.text).toContain("User-agent: *");
       expect(res.text).toContain("Disallow: /admin");
       expect(res.text).toContain("Disallow: /api/");
+      expect(res.text).toContain("Disallow: /private/");
+      expect(res.text).toContain("Disallow: /reports/");
       expect(res.text).toContain("Sitemap: https://bylot.in/sitemap.xml");
     });
   });
@@ -143,6 +145,45 @@ describe("SEO & SPA 404 Route Handling Integration Tests", () => {
         expect(res.status).toBe(404);
         expect(res.text).toContain("Product No Longer Available | Bylot");
         expect(res.text).toContain('name="robots" content="noindex, nofollow"');
+      } finally {
+        pool.query = originalQuery;
+      }
+    });
+
+    it("should serve canonical URL and Schema.org WebSite JSON-LD on homepage", async () => {
+      const res = await request(app).get("/");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain('<link rel="canonical" href="https://bylot.in/"');
+      expect(res.text).toContain('"@type":"WebSite"');
+      expect(res.text).toContain('"urlTemplate":"https://bylot.in/browse?q={search_term_string}"');
+    });
+
+    it("should return noindex for private /admin route", async () => {
+      const res = await request(app).get("/admin");
+      expect(res.status).toBe(200);
+      expect(res.text).toContain('name="robots" content="noindex, follow"');
+    });
+
+    it("should serve noindex, follow for expired products to prevent index bloat", async () => {
+      const { pool } = require("../config/db");
+      const originalQuery = pool.query;
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+      pool.query = jest.fn().mockResolvedValueOnce([[
+        {
+          id: 555,
+          name: "Expired Milk",
+          description: "Near expiry milk",
+          selling_price: 30,
+          mrp: 50,
+          stock_quantity: 2,
+          expiry_date: yesterday,
+          status: "active"
+        }
+      ]]);
+      try {
+        const res = await request(app).get("/product/555");
+        expect(res.status).toBe(200);
+        expect(res.text).toContain('name="robots" content="noindex, follow"');
       } finally {
         pool.query = originalQuery;
       }

@@ -89,3 +89,20 @@ The web frontend includes a dedicated **Security & MCP** dashboard within the Ad
 - Real-time Threat Level indicator and security audit stream.
 - Live MCP Interactive Tool Sandbox to test tool execution with instant JSON output.
 - Active lockouts monitor and one-click security refresh.
+- Admin Two-Step Verification (2FA) settings: status monitoring, one-time recovery code regeneration, and cryptographically verified 2FA toggle.
+
+---
+
+## 5. Admin Two-Factor Authentication (TOTP 2FA)
+
+### Security Specifications & Architecture
+- **Protocol**: Standard RFC 6238 TOTP (SHA-1, 30-second step, 6-digit codes, ±1 window clock-skew tolerance).
+- **Compatible Authenticator**: Google Authenticator, Microsoft Authenticator, Apple Passwords, 1Password, Bitwarden.
+- **Challenge Architecture**: Short-lived (5-minute expiration) cryptographically secure single-use challenges (`admin_2fa_challenges`).
+- **Access Token Guard**: Neither admin JWT access tokens nor refresh tokens are issued before successful TOTP or backup code verification.
+- **Secret Encryption at Rest**: Encrypted in `admin_2fa` table using authenticated AES-256-GCM (`cryptoUtil.encryptPII`) with random 16-byte IVs. Raw secrets are NEVER returned via APIs or recorded in audit logs.
+- **Emergency Recovery Codes**: 10 cryptographically random single-use recovery codes (`XXXX-XXXX`) generated on setup or regeneration. Stored exclusively as normalized SHA-256 hashes (`admin_2fa_recovery_codes`) with immediate invalidation upon consumption (`used_at` timestamp).
+- **Anti-Brute Force**: 5-attempt challenge limit per session, challenge invalidation on threshold exceedance, IP rate limiting via `twoFactorLimiter`, and generic error messages preventing credential enumeration.
+- **Replay Protection**: Stores `last_used_time_step` on admin record; prevents replaying identical OTP codes within the same valid time window.
+- **Google OAuth Admin Guard**: Administrators logging in via Google OAuth are strictly subjected to the mandatory 2FA challenge flow; customer Google OAuth continues uninterrupted.
+

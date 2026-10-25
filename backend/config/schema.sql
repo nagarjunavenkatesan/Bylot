@@ -51,6 +51,43 @@ CREATE TABLE IF NOT EXISTS admin (
   CONSTRAINT fk_admin_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS admin_2fa (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  admin_user_id BIGINT UNSIGNED NOT NULL UNIQUE,
+  secret_encrypted TEXT NOT NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
+  last_used_time_step BIGINT NULL DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_admin_2fa_user FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_admin_2fa_user (admin_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS admin_2fa_recovery_codes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  admin_user_id BIGINT UNSIGNED NOT NULL,
+  code_hash VARCHAR(255) NOT NULL,
+  used_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_admin_recovery_user FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_admin_recovery_lookup (admin_user_id, used_at)
+);
+
+CREATE TABLE IF NOT EXISTS admin_2fa_challenges (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  challenge_id VARCHAR(64) NOT NULL UNIQUE,
+  admin_user_id BIGINT UNSIGNED NOT NULL,
+  challenge_type ENUM('login', 'setup') NOT NULL DEFAULT 'login',
+  temp_secret_encrypted TEXT NULL,
+  attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  max_attempts INT UNSIGNED NOT NULL DEFAULT 5,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_admin_challenge_user FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_admin_challenge_lookup (challenge_id, expires_at),
+  INDEX idx_admin_challenge_user (admin_user_id)
+);
+
 CREATE TABLE IF NOT EXISTS sellers (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL UNIQUE,
@@ -113,6 +150,11 @@ CREATE TABLE IF NOT EXISTS products (
   batch_number VARCHAR(80) NULL,
   product_type ENUM('daily_essential', 'near_expiry', 'discount', 'corporate_clearance') NOT NULL DEFAULT 'daily_essential',
   image_url VARCHAR(255) NULL,
+  country VARCHAR(80) NOT NULL DEFAULT 'India',
+  state VARCHAR(100) NULL,
+  district VARCHAR(100) NULL,
+  city VARCHAR(100) NULL,
+  locality VARCHAR(190) NULL,
   status ENUM('draft', 'active', 'inactive', 'out_of_stock', 'blocked', 'deleted') NOT NULL DEFAULT 'active',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -129,6 +171,7 @@ CREATE TABLE IF NOT EXISTS products (
   INDEX idx_products_cat_status_created (category_id, status, created_at),
   INDEX idx_products_seller_status (seller_id, status),
   INDEX idx_products_item_id (product_item_id),
+  INDEX idx_products_location (state, district),
   FULLTEXT INDEX idx_products_ft (name, brand, description)
 );
 
@@ -259,4 +302,41 @@ CREATE TABLE IF NOT EXISTS token_blacklist (
   INDEX idx_tb_hash (token_hash),
   INDEX idx_tb_jti (token_jti),
   INDEX idx_tb_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS admin_report_archives (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  report_id VARCHAR(120) NOT NULL UNIQUE,
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  period_days INT UNSIGNED NOT NULL DEFAULT 30,
+  status ENUM('PENDING', 'GENERATING', 'READY', 'FAILED', 'DELETED') NOT NULL DEFAULT 'PENDING',
+  file_path VARCHAR(255) NULL,
+  file_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  checksum_sha256 VARCHAR(64) NULL,
+  plaintext_sha256 VARCHAR(64) NULL,
+  ciphertext_sha256 VARCHAR(64) NULL,
+  encryption_algorithm VARCHAR(40) NOT NULL DEFAULT 'AES-256-GCM',
+  encryption_iv VARCHAR(64) NULL,
+  encryption_tag VARCHAR(64) NULL,
+  encrypted_dek TEXT NULL,
+  manifest_summary JSON NULL,
+  error_message VARCHAR(255) NULL,
+  created_by BIGINT UNSIGNED NOT NULL,
+  expires_at TIMESTAMP NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_report_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_reports_status (status),
+  INDEX idx_reports_created (created_at),
+  INDEX idx_reports_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS india_states_reference (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(10) NOT NULL UNIQUE,
+  name VARCHAR(100) NOT NULL UNIQUE,
+  type ENUM('state', 'union_territory') NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

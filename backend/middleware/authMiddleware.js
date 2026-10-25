@@ -43,9 +43,25 @@ async function authenticate(req, res, next) {
 }
 
 function authorize(...roles) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
       return next(new AppError("You do not have permission for this action.", 403));
+    }
+    // Mandatory Admin 2FA check: administrators cannot access admin business routes without active 2FA
+    // Allow self-service 2FA status and enrollment endpoints
+    const isSelf2faEndpoint = req.baseUrl === "/api/admin" && (req.path === "/2fa/status" || req.path === "/2fa/setup");
+    if (!isSelf2faEndpoint && roles.includes("admin") && req.user.role === "admin") {
+      try {
+        const [rows] = await pool.execute(
+          "SELECT enabled FROM admin_2fa WHERE admin_user_id = ? LIMIT 1",
+          [req.user.id]
+        );
+        if (!rows[0] || !rows[0].enabled) {
+          return next(new AppError("Administrator two-step authentication is mandatory. Please complete 2FA setup.", 403));
+        }
+      } catch (err) {
+        return next(err);
+      }
     }
     return next();
   };

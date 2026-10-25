@@ -28,3 +28,7 @@ backups/
 *.sql.gz
 .gradle/
 **/.gradle/
+private/
+**/private/
+*.enc
+**/*.enc

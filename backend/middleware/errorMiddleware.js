@@ -59,8 +59,8 @@ function errorHandler(err, req, res, _next) {
   const friendly = getFriendlyMessage(err);
   const finalMessage = friendly || (statusCode === 500 ? "Something went wrong. Please try again." : message);
 
-  if (env.nodeEnv !== "test") {
-    console.error(`[ERROR] ${statusCode} -`, err.message || err);
+  if (env.nodeEnv !== "test" || statusCode === 500) {
+    console.error(`[ERROR] ${statusCode} -`, err.stack || err.message || err);
   }
 
   return error(res, finalMessage, statusCode, err.errors);

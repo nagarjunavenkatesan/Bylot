@@ -25,6 +25,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const securityRoutes = require("./routes/securityRoutes");
 const mcpRoutes = require("./routes/mcpRoutes");
+const locationRoutes = require("./routes/locationRoutes");
 
 const cookieParser = require("cookie-parser");
 
@@ -198,7 +199,16 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/security", securityRoutes);
+app.use("/api/locations", locationRoutes);
 app.use("/mcp", mcpRoutes);
+
+// Strictly deny direct web access to private storage (reports, keys, evidence archives)
+app.use(["/private", "/private/*"], (req, res) => {
+  res.status(403).json({
+    success: false,
+    message: "Direct access to private archives is forbidden"
+  });
+});
 
 const { validateAndGetPageSeo, renderHtmlWithSeo } = require("./services/seoRenderer");
 
@@ -246,6 +256,7 @@ app.get("*", async (req, res, next) => {
   if (
     req.path.startsWith("/api") ||
     req.path.startsWith("/uploads") ||
+    req.path.startsWith("/private") ||
     req.path.startsWith("/health") ||
     req.path.startsWith("/mcp") ||
     req.path.includes("/.") ||

@@ -8,6 +8,7 @@ const { findSellerByUserId } = require("../models/sellerModel");
 const { findProductById } = require("../models/productModel");
 const { publicFileUrl, deleteUploadedFile } = require("../middleware/uploadMiddleware");
 const { clearHotCache } = require("./productController");
+const { isValidStateOrUT, resolveCanonicalState } = require("../config/indiaLocations");
 
 async function requireSeller(userId) {
   const seller = await findSellerByUserId(userId);
@@ -140,13 +141,26 @@ const addProduct = asyncHandler(async (req, res) => {
     imageUrl = body.image;
   }
 
+  let canonicalState = null;
+  if (body.state) {
+    if (!isValidStateOrUT(body.state)) {
+      throw new AppError("Invalid State or Union Territory. Please select a valid Indian State or UT.", 400);
+    }
+    canonicalState = resolveCanonicalState(body.state);
+  }
+  const country = body.country ? String(body.country).trim() : "India";
+  const district = body.district ? String(body.district).trim().slice(0, 100) : null;
+  const city = body.city ? String(body.city).trim().slice(0, 100) : null;
+  const locality = body.locality ? String(body.locality).trim().slice(0, 190) : null;
+
   let result;
   try {
     [result] = await pool.execute(
       `INSERT INTO products
        (product_item_id, seller_id, category_id, name, slug, description, sku, brand, mrp, selling_price, discount_percent,
-        stock_quantity, low_stock_threshold, expiry_date, manufacture_date, batch_number, product_type, image_url, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        stock_quantity, low_stock_threshold, expiry_date, manufacture_date, batch_number, product_type, image_url, status,
+        country, state, district, city, locality)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         productItemId,
         seller.id,
@@ -166,7 +180,12 @@ const addProduct = asyncHandler(async (req, res) => {
         body.batchNumber || null,
         body.productType || "daily_essential",
         imageUrl,
-        productStatus
+        productStatus,
+        country,
+        canonicalState,
+        district,
+        city,
+        locality
       ]
     );
   } catch (err) {
@@ -341,6 +360,18 @@ const editProduct = asyncHandler(async (req, res) => {
     statusToSet = "out_of_stock";
   }
 
+  let stateToSet = undefined;
+  if (req.body.state !== undefined) {
+    if (req.body.state === null || req.body.state === "") {
+      stateToSet = null;
+    } else {
+      if (!isValidStateOrUT(req.body.state)) {
+        throw new AppError("Invalid State or Union Territory. Please select a valid Indian State or UT.", 400);
+      }
+      stateToSet = resolveCanonicalState(req.body.state);
+    }
+  }
+
   const updates = {
     category_id: categoryId,
     name: req.body.name ? String(req.body.name).trim() : undefined,
@@ -357,7 +388,12 @@ const editProduct = asyncHandler(async (req, res) => {
     batch_number: req.body.batchNumber !== undefined ? req.body.batchNumber : undefined,
     product_type: req.body.productType !== undefined ? req.body.productType : undefined,
     image_url: imageUrl,
-    status: statusToSet
+    status: statusToSet,
+    country: req.body.country !== undefined ? String(req.body.country).trim() : undefined,
+    state: stateToSet,
+    district: req.body.district !== undefined ? (req.body.district ? String(req.body.district).trim().slice(0, 100) : null) : undefined,
+    city: req.body.city !== undefined ? (req.body.city ? String(req.body.city).trim().slice(0, 100) : null) : undefined,
+    locality: req.body.locality !== undefined ? (req.body.locality ? String(req.body.locality).trim().slice(0, 190) : null) : undefined
   };
 
   const fields = Object.entries(updates).filter(([, value]) => value !== undefined);

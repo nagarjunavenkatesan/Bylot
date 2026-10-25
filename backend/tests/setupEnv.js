@@ -14,7 +14,7 @@ if (!process.env.DB_PASSWORD) {
   console.error("\n[TEST ERROR] DB_PASSWORD environment variable is required for tests. Aborting.");
   process.exit(1);
 }
-process.env.DB_NAME = process.env.DB_NAME || "bylot_test";
+process.env.DB_NAME = (process.env.DB_NAME && process.env.DB_NAME.endsWith("_test")) ? process.env.DB_NAME : `${process.env.DB_NAME || "bylot"}_test`;
 
 if (!process.env.DB_NAME.endsWith("_test")) {
   console.error(`\n[TEST ERROR] Tests must use a dedicated database ending in '_test'. Current DB_NAME="${process.env.DB_NAME}". Aborting.`);

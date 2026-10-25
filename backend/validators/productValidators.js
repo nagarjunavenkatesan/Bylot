@@ -1,4 +1,5 @@
 const { body, query, param } = require("express-validator");
+const { isValidStateOrUT } = require("../config/indiaLocations");
 
 const productId = [
   param("id").isInt({ min: 1 })
@@ -51,7 +52,17 @@ const createProduct = [
   body("batchNumber").optional({ nullable: true }).trim().isLength({ max: 80 }),
   body("productType").optional().isIn(["daily_essential", "near_expiry", "discount", "corporate_clearance"]),
   body("imageUrl").optional({ nullable: true }).isString().isLength({ max: 500 }),
-  body("status").optional().isIn(["active", "inactive"])
+  body("status").optional().isIn(["active", "inactive"]),
+  body("state").optional({ nullable: true }).trim().custom((value) => {
+    if (value && !isValidStateOrUT(value)) {
+      throw new Error("Invalid State or Union Territory. Must be one of the 28 Indian States or 8 Union Territories.");
+    }
+    return true;
+  }),
+  body("district").optional({ nullable: true }).trim().isLength({ max: 100 }),
+  body("city").optional({ nullable: true }).trim().isLength({ max: 100 }),
+  body("locality").optional({ nullable: true }).trim().isLength({ max: 190 }),
+  body("country").optional({ nullable: true }).trim().isLength({ max: 80 })
 ];
 
 const updateProduct = [
@@ -77,7 +88,17 @@ const updateProduct = [
   body("batchNumber").optional({ nullable: true }).trim().isLength({ max: 80 }),
   body("productType").optional().isIn(["daily_essential", "near_expiry", "discount", "corporate_clearance"]),
   body("imageUrl").optional({ nullable: true }).isString().isLength({ max: 500 }),
-  body("status").optional().isIn(["active", "inactive"])
+  body("status").optional().isIn(["active", "inactive"]),
+  body("state").optional({ nullable: true }).trim().custom((value) => {
+    if (value && !isValidStateOrUT(value)) {
+      throw new Error("Invalid State or Union Territory. Must be one of the 28 Indian States or 8 Union Territories.");
+    }
+    return true;
+  }),
+  body("district").optional({ nullable: true }).trim().isLength({ max: 100 }),
+  body("city").optional({ nullable: true }).trim().isLength({ max: 100 }),
+  body("locality").optional({ nullable: true }).trim().isLength({ max: 190 }),
+  body("country").optional({ nullable: true }).trim().isLength({ max: 80 })
 ];
 
 const inventory = [

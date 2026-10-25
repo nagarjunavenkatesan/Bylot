@@ -6,6 +6,10 @@ const { authLimiter } = require("../middleware/rateLimitMiddleware");
 const { cookieCsrfProtection } = require("../middleware/csrfProtection");
 const validators = require("../validators/authValidators");
 
+const adminController = require("../controllers/adminController");
+const adminValidators = require("../validators/adminValidators");
+const { twoFactorLimiter } = require("../middleware/rateLimitMiddleware");
+
 const router = express.Router();
 
 router.post("/register", authLimiter, validators.register, validate, controller.register);
@@ -14,6 +18,10 @@ router.get("/verify-email", authLimiter, controller.verifyEmail);
 router.post("/resend-verification", authLimiter, validators.resendVerification, validate, controller.resendVerification);
 router.post("/login", authLimiter, validators.login, validate, controller.login);
 router.post("/google-login", authLimiter, validators.googleLogin, validate, controller.googleLogin);
+router.post("/2fa/verify-login", twoFactorLimiter, adminValidators.verifyLogin2FA, validate, adminController.verifyLogin2FA);
+router.post("/2fa/verify-setup", twoFactorLimiter, adminValidators.verifySetup2FA, validate, adminController.verifySetup2FA);
+router.post("/2fa/verify-recovery", twoFactorLimiter, adminValidators.recovery2FA, validate, adminController.recoveryLogin2FA);
+router.post("/2fa/recovery", twoFactorLimiter, adminValidators.recovery2FA, validate, adminController.recoveryLogin2FA);
 router.post("/logout", cookieCsrfProtection, authenticate, controller.logout);
 router.post("/refresh-token", cookieCsrfProtection, validators.refreshToken, validate, controller.refreshToken);
 router.post("/forgot-password", authLimiter, validators.forgotPassword, validate, controller.forgotPassword);

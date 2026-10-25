@@ -1,8 +1,9 @@
 const rateLimit = require("express-rate-limit");
+const isTestEnv = process.env.NODE_ENV === "test";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: isTestEnv ? 1000 : 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -44,8 +45,20 @@ const uploadLimiter = rateLimit({
   }
 });
 
+const twoFactorLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isTestEnv ? 1000 : 30, // 30 attempts per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: "Too many verification attempts. Please try again later."
+  }
+});
+
 module.exports = {
   authLimiter,
+  twoFactorLimiter,
   publicGetLimiter,
   writeLimiter,
   uploadLimiter,

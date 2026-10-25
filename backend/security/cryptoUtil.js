@@ -1,15 +1,15 @@
 const crypto = require("crypto");
 
 const ALGORITHM = "aes-256-gcm";
-const IV_LENGTH = 16;
-const _TAG_LENGTH = 16;
+const IV_LENGTH = 12; // 96-bit IV standard for AES-GCM (NIST SP 800-38D)
+const _TAG_LENGTH = 16; // 128-bit authentication tag
 
-function getMasterKey() {
+function getMasterKey(customSecret = null) {
   const isProd = process.env.NODE_ENV === "production";
-  const secret = process.env.ENCRYPTION_KEY || (!isProd ? process.env.JWT_ACCESS_SECRET : "");
+  const secret = customSecret || process.env.REPORT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY || (!isProd ? process.env.JWT_ACCESS_SECRET : "");
   if (!secret) {
     if (isProd) {
-      throw new Error("[FATAL] ENCRYPTION_KEY must be configured in production.");
+      throw new Error("[FATAL] ENCRYPTION_KEY or REPORT_ENCRYPTION_KEY must be configured in production.");
     }
     return crypto.createHash("sha256").update("dev_insecure_local_only_key_never_in_production").digest();
   }
@@ -91,6 +91,7 @@ function checkPasswordStrength(password) {
 }
 
 module.exports = {
+  getMasterKey,
   encryptPII,
   decryptPII,
   generateSecureToken,

@@ -16,6 +16,7 @@ const loginSEO = pageSEO({
 
 import { apiRequest } from '../api/backendApi';
 import { useGoogleAuth } from '../components/GoogleProvider';
+import TwoFactorAuthFlow from '../components/TwoFactorAuthFlow';
 
 function getRedirectPath(role) {
     switch (role) {
@@ -36,6 +37,7 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [twoFactorChallenge, setTwoFactorChallenge] = useState(null);
 
     useEffect(() => {
         if (user) {
@@ -58,10 +60,15 @@ const Login = () => {
                 method: 'POST',
                 body: JSON.stringify({ email, password }),
             });
-            const userData = data.data?.user || data.user;
-            const accessToken = data.data?.accessToken || data.accessToken || data.user?.token;
+            const payload = data?.data || data;
+            if (payload?.requires2FA || payload?.requires2FASetup) {
+                setTwoFactorChallenge(payload);
+                return;
+            }
+            const userData = payload?.user;
+            const accessToken = payload?.accessToken || payload?.user?.token;
             login({ ...userData, accessToken });
-            const redirect = location.state?.from || getRedirectPath(userData.role);
+            const redirect = location.state?.from || getRedirectPath(userData?.role);
             navigate(redirect, { replace: true });
         } catch (err) {
             setError(err.message || 'Login failed. Please check your credentials.');
@@ -78,10 +85,15 @@ const Login = () => {
                 method: 'POST',
                 body: JSON.stringify({ idToken: credentialResponse.credential }),
             });
-            const userData = data.data?.user || data.user;
-            const accessToken = data.data?.accessToken || data.accessToken || data.user?.token;
+            const payload = data?.data || data;
+            if (payload?.requires2FA || payload?.requires2FASetup) {
+                setTwoFactorChallenge(payload);
+                return;
+            }
+            const userData = payload?.user;
+            const accessToken = payload?.accessToken || payload?.user?.token;
             login({ ...userData, accessToken });
-            const redirect = location.state?.from || getRedirectPath(userData.role);
+            const redirect = location.state?.from || getRedirectPath(userData?.role);
             navigate(redirect, { replace: true });
         } catch (err) {
             setError(err.message || 'Google sign-in failed. Please try again.');
@@ -93,6 +105,31 @@ const Login = () => {
     const handleGoogleError = () => {
         setError('Google sign-in was cancelled or encountered an error.');
     };
+
+    const handleTwoFactorSuccess = (authPayload) => {
+        const payload = authPayload?.data || authPayload;
+        const userData = payload?.user;
+        const accessToken = payload?.accessToken || payload?.token;
+        login({ ...userData, accessToken });
+        setTwoFactorChallenge(null);
+        const redirect = location.state?.from || getRedirectPath(userData?.role || 'admin');
+        navigate(redirect, { replace: true });
+    };
+
+    if (twoFactorChallenge) {
+        return (
+            <PageTransition>
+                <SEOHead {...loginSEO} />
+                <div className="container" style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem' }}>
+                    <TwoFactorAuthFlow
+                        challengeData={twoFactorChallenge}
+                        onSuccess={handleTwoFactorSuccess}
+                        onCancel={() => setTwoFactorChallenge(null)}
+                    />
+                </div>
+            </PageTransition>
+        );
+    }
 
     return (
         <PageTransition>

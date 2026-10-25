@@ -15,7 +15,7 @@ const REPORT_REASONS = [
     { value: 'other',             label: 'Other' },
 ];
 
-const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => {
+const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete, topHeader, isSelected = false, className = '' }) => {
     // Hooks must be called unconditionally on every render
     const [showReport, setShowReport]     = useState(false);
     const [reason, setReason]             = useState('fake_product');
@@ -66,8 +66,16 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete }) => 
     const isNearExpiry = !isExpired && (product.expiryStatus === 'Near Expiry' || product.expiryStatus === 'Expiring Soon');
 
     return (
-        <Card className="listing-card google-skill-card">
+        <Card className={`listing-card google-skill-card ${isSelected ? 'is-selected' : ''} ${className}`.trim()}>
             <div className="google-card-accent-bar" />
+
+            {/* Integrated Top Header (e.g. Admin selection checkbox & Product ID) */}
+            {topHeader && (
+                <div className="card-top-header">
+                    {topHeader}
+                </div>
+            )}
+
             {/* Product image */}
             <Link to={`/product/${product.id}`} style={{ display: 'block', color: 'inherit' }}>
                 <div className="listing-image-container">
