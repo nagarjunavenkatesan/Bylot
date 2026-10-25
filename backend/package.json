@@ -14,6 +14,8 @@
     "seed-benchmark": "node scripts/seedBenchmark.js",
     "benchmark": "node scripts/benchmark.js",
     "backup-test": "node scripts/backupRestoreTest.js",
+    "encryption-test": "node scripts/verifyReportBackupAndDecryption.js",
+    "stress-test": "node scripts/loadAndStressTest.js",
     "mcp": "node mcp/server.js",
     "lint": "eslint .",
     "test": "jest --runInBand --detectOpenHandles --forceExit"

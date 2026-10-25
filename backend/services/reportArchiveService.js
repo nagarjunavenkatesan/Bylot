@@ -531,7 +531,7 @@ Contents:
 - buyers/buyer-data.json       : Sanitized buyer evidence records
 - sellers/seller-data.json     : Sanitized seller profiles & performance
 - products/product-data.json   : Product listings & location hierarchy
-- orders/order-data.json       : Orders & delivery references (No payments)
+- orders/order-data.json       : Orders & delivery references (Direct fulfillment)
 - reports/complaints.json      : Product disputes & dispute logs
 - audit/admin-actions.json     : Administrative action audit records
 - images/                      : Compressed WebP evidence images & thumbnails

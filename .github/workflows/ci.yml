@@ -111,6 +111,32 @@ jobs:
           JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
         run: npm run backup-test
 
+      - name: Report archive & encryption verification
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
+          DB_NAME: bylot_test
+          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
+          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
+          REPORT_ENCRYPTION_KEY: ci_test_super_secret_report_key_minimum_32_chars!
+        run: npm run encryption-test
+
+      - name: Load & stress benchmark test
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
+          DB_NAME: bylot_test
+          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
+          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
+          SESSION_SECRET: ci_test_super_secret_session_key_minimum_32_chars!
+        run: npm run stress-test
+
   frontend:
     name: Frontend Lint, Audit, Build & Tests
     runs-on: ubuntu-latest
