@@ -39,12 +39,33 @@ jobs:
 
       - name: Block Payment code
         run: |
-          if git grep -i -E "razorpay|stripe|paypal" -- ":!migrations" ":!docs/MIGRATIONS.md" ":!*.test.js" ":!.github/**" ":!*.md" ":!*package-lock.json"; then
-            echo "Payment references found"
+          echo "Verifying zero active payment functionality..."
+          # 1. Block payment gateway provider SDKs and keywords in active code
+          if git grep -i -E "razorpay|stripe|paypal|cashfree|paytm" -- ":!*migrations*" ":!docs/MIGRATIONS.md" ":!*.test.js" ":!.github/**" ":!*.md" ":!*package-lock.json"; then
+            echo "Error: Payment gateway provider references found!"
             exit 1
-          else
-            echo "No payment references"
           fi
+          # 2. Block active payment routes and webhooks
+          if git grep -i -E "\.(get|post|put|patch|delete)\s*\(['\"].*(/payment|/checkout|/webhook)" -- ":!*.test.js" ":!*.md"; then
+            echo "Error: Active payment or checkout API routes found!"
+            exit 1
+          fi
+          # 3. Block client payment initiation and gateway calls
+          if git grep -i -E "\b(makePayment|payNow|verifyPayment|processPayment|initiatePayment|new Razorpay|new Stripe|loadStripe)\s*\(" -- ":!*.test.js" ":!*.md"; then
+            echo "Error: Payment function calls found!"
+            exit 1
+          fi
+          # 4. Block payment credentials / environment variables
+          if git grep -i -E "\b(RAZORPAY_|STRIPE_|PAYPAL_|CASHFREE_)(KEY|SECRET|TOKEN|ID|WEBHOOK)" -- ":!*.test.js" ":!*.md"; then
+            echo "Error: Payment credentials found in configuration!"
+            exit 1
+          fi
+          # 5. Block active payment database tables or columns outside migrations
+          if git grep -i -E "\b(payment_status|payment_method|payment_id)\b|CREATE TABLE.*payments" -- ":!*migrations*" ":!*.test.js" ":!*.md"; then
+            echo "Error: Active payment database schema columns found!"
+            exit 1
+          fi
+          echo "Verified: ZERO active payment functionality in repository."
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

@@ -1,7 +1,7 @@
 const request = require("supertest");
 const app = require("../app");
 const { pool } = require("../config/db");
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
 const { createTestUser, cleanTestData } = require("./setup");
 const { signAccessToken } = require("../utils/token");
 const { blockUser } = require("../controllers/adminController");
@@ -166,21 +166,64 @@ describe("General Security, Sanitization and Resilience", () => {
     }
   });
 
-  test("Security check: grep confirms no payment/razorpay code remains in repo (except migrations)", () => {
-    let output;
-    try {
-      output = execSync(
-        'git grep -i -E "payment|razorpay" -- ":!migrations" ":!docs/MIGRATIONS.md" ":!*.md" ":!*.test.js"',
-        { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
-      ).trim();
-    } catch (err) {
-      if (err.status === 1) {
-        output = "";
-      } else {
+  test("Security check: grep confirms zero active payment functionality remains in repository", () => {
+    function runGitGrep(pattern, paths = []) {
+      const args = ["grep", "-i", "-E", pattern, "--", ...paths];
+      try {
+        return execFileSync("git", args, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+      } catch (err) {
+        if (err.status === 1) return "";
         throw err;
       }
     }
-    expect(output).toBe("");
+
+    // 1. Payment gateway provider SDKs and keywords in active code
+    const gatewayMatches = runGitGrep("razorpay|stripe|paypal|cashfree|paytm", [
+      ":!*migrations*",
+      ":!*package-lock.json",
+      ":!*.md",
+      ":!*.test.js",
+      ":!.github/**"
+    ]);
+
+    // 2. Active payment SDK imports/requires
+    const sdkImports = runGitGrep("(require\\(['\"].*(razorpay|stripe|paypal|cashfree)|from ['\"].*(razorpay|stripe|paypal|cashfree))", [
+      ":!*package-lock.json",
+      ":!*.md",
+      ":!*.test.js"
+    ]);
+
+    // 3. Payment API routes and endpoints
+    const paymentRoutes = runGitGrep("\\.(get|post|put|patch|delete)\\s*\\(['\"].*(/payment|/checkout|/webhook)", [
+      ":!*.test.js",
+      ":!*.md"
+    ]);
+
+    // 4. Client payment initiation and gateway calls
+    const paymentFunctions = runGitGrep("\\b(makePayment|payNow|verifyPayment|processPayment|initiatePayment|new Razorpay|new Stripe|loadStripe)\\s*\\(", [
+      ":!*.test.js",
+      ":!*.md"
+    ]);
+
+    // 5. Payment gateway credentials / environment variables
+    const paymentCredentials = runGitGrep("\\b(RAZORPAY_|STRIPE_|PAYPAL_|CASHFREE_)(KEY|SECRET|TOKEN|ID|WEBHOOK)", [
+      ":!*.test.js",
+      ":!*.md"
+    ]);
+
+    // 6. Active payment DB tables or columns (outside migrations)
+    const paymentSchema = runGitGrep("\\b(payment_status|payment_method|payment_id)\\b|CREATE TABLE.*payments", [
+      ":!*migrations*",
+      ":!*.test.js",
+      ":!*.md"
+    ]);
+
+    expect(gatewayMatches).toBe("");
+    expect(sdkImports).toBe("");
+    expect(paymentRoutes).toBe("");
+    expect(paymentFunctions).toBe("");
+    expect(paymentCredentials).toBe("");
+    expect(paymentSchema).toBe("");
   });
 
   test("Security check: grep confirms no Telegram or BotFather code remains in repository", () => {
