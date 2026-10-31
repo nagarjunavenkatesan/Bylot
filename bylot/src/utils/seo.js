@@ -8,7 +8,7 @@
 export const SITE = {
   name:          'Bylot',
   tagline:       'India\'s Hyperlocal Discount & Surplus Marketplace',
-  url:           import.meta.env.VITE_SITE_URL || 'https://bylot.in',
+  url:           (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SITE_URL) || 'https://bylot.in',
   description:   "Bylot is India's premier hyperlocal marketplace for near-expiry, surplus, and discounted essentials. Connect with verified local stores in Bengaluru, Chennai, Coimbatore & Trichy to save up to 70% while reducing food waste.",
   twitterHandle: '@bylot_in',
   locale:        'en_IN',

@@ -94,13 +94,15 @@ async function validateAndGetPageSeo(reqPath, query = {}) {
       "/about": "About Us – India's Hyperlocal Discount Marketplace | Bylot",
       "/contact": "Contact Us – Customer Support & Partnerships | Bylot",
       "/faq": "Frequently Asked Questions | Bylot Marketplace",
-      "/terms": "Terms & Conditions of Service | Bylot",
+      "/terms": "Terms & Conditions | Bylot",
       "/privacy": "Privacy Policy & Data Security | Bylot"
     };
     return {
       status: 200,
       title: titleMap[cleanPath] || `Bylot – ${slugToTitle(cleanPath.slice(1))}`,
-      description: `Official ${cleanPath.slice(1)} information page for Bylot marketplace.`,
+      description: cleanPath === "/terms"
+        ? "Read the Terms & Conditions governing the use of Bylot, a hyperlocal marketplace connecting buyers and sellers."
+        : `Official ${cleanPath.slice(1)} information page for Bylot marketplace.`,
       canonical: `${BASE_URL}${cleanPath}`,
       image: DEFAULT_IMAGE,
       robots: "index, follow",

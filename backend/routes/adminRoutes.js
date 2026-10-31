@@ -35,6 +35,7 @@ router.delete("/products/expired", controller.deleteAllExpiredProducts);
 router.delete("/products/expired/selected", validators.deleteSelectedExpired, validate, controller.deleteSelectedExpiredProducts);
 router.delete("/products/expired/:id", validators.idParam, validate, controller.deleteSingleExpiredProduct);
 router.get("/products/by-id", controller.searchProductByItemId);
+router.get("/products/deleted", controller.getDeletedProducts);
 router.patch("/products/:id/status", validators.idParam, validators.productStatus, validate, controller.updateProductStatus);
 router.delete("/products/:id", validators.idParam, validate, controller.deleteProduct);
 const archiveController = require("../controllers/reportArchiveController");

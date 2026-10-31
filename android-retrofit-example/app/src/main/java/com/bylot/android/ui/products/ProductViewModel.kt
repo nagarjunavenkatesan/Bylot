@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 data class ProductUiState(
     val isLoading: Boolean = false,
     val products: List<Product> = emptyList(),
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val successMessage: String? = null
 )
 
 class ProductViewModel(
@@ -31,7 +32,8 @@ class ProductViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
-                errorMessage = null
+                errorMessage = null,
+                successMessage = null
             )
 
             when (val result = repository.fetchProducts()) {
@@ -51,5 +53,33 @@ class ProductViewModel(
                 }
             }
         }
+    }
+
+    fun deleteProduct(id: Long, onComplete: ((Boolean, String?) -> Unit)? = null) {
+        viewModelScope.launch {
+            when (val result = repository.deleteProduct(id)) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        products = _uiState.value.products.filterNot { it.id == id },
+                        successMessage = "Item deleted successfully."
+                    )
+                    onComplete?.invoke(true, "Item deleted successfully.")
+                }
+
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = result.message
+                    )
+                    onComplete?.invoke(false, result.message)
+                }
+            }
+        }
+    }
+
+    fun clearMessages() {
+        _uiState.value = _uiState.value.copy(
+            errorMessage = null,
+            successMessage = null
+        )
     }
 }

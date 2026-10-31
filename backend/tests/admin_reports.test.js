@@ -7,7 +7,7 @@ const { pool } = require("../config/db");
 const { createTestUser, createTestSeller, createTestProduct, cleanTestData } = require("./setup");
 const { signAccessToken } = require("../utils/token");
 const reportArchiveService = require("../services/reportArchiveService");
-const { decryptPII, encryptPII } = require("../security/cryptoUtil");
+const { decryptPII } = require("../security/cryptoUtil");
 const { ALL_INDIA_REGIONS, INDIA_STATES, INDIA_UNION_TERRITORIES, isValidStateOrUT, resolveCanonicalState } = require("../config/indiaLocations");
 
 describe("Admin Reports & Archives + India Locations System", () => {

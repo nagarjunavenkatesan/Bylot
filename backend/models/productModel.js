@@ -5,8 +5,10 @@ const productListSelect = `
   p.id, p.product_item_id, p.seller_id, p.category_id, p.name, p.slug, p.sku, p.brand,
   p.mrp, p.selling_price, p.discount_percent, p.stock_quantity, p.low_stock_threshold,
   p.expiry_date, p.manufacture_date, p.batch_number, p.product_type, p.image_url,
-  p.status, p.country, p.state, p.district, p.city, p.locality, p.created_at, p.updated_at,
+  p.status, p.deleted_at, p.deleted_by, p.deletion_reason,
+  p.country, p.state, p.district, p.city, p.locality, p.created_at, p.updated_at,
   c.name AS category_name,
+  s.user_id AS seller_user_id,
   s.business_name AS seller_name,
   s.latitude AS seller_latitude,
   s.longitude AS seller_longitude
@@ -17,8 +19,10 @@ const productDetailSelect = `
   p.id, p.product_item_id, p.seller_id, p.category_id, p.name, p.slug, p.description, p.sku, p.brand,
   p.mrp, p.selling_price, p.discount_percent, p.stock_quantity, p.low_stock_threshold,
   p.expiry_date, p.manufacture_date, p.batch_number, p.product_type, p.image_url,
-  p.status, p.country, p.state, p.district, p.city, p.locality, p.created_at, p.updated_at,
+  p.status, p.deleted_at, p.deleted_by, p.deletion_reason,
+  p.country, p.state, p.district, p.city, p.locality, p.created_at, p.updated_at,
   c.name AS category_name,
+  s.user_id AS seller_user_id,
   s.business_name AS seller_name,
   s.latitude AS seller_latitude,
   s.longitude AS seller_longitude

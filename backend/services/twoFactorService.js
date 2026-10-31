@@ -22,12 +22,12 @@ function generateTotpSecret() {
 
 /**
  * Builds an otpauth:// URI compatible with Google Authenticator and RFC 6238.
- * Format: otpauth://totp/Bylot:admin@example.com?secret=SECRET&issuer=Bylot
+ * Format: otpauth://totp/Bylot:admin@example.com?secret=SECRET&period=30&digits=6&algorithm=SHA1&issuer=Bylot
  */
 function generateProvisioningUri(email, secret) {
-  const safeLabel = encodeURIComponent(email);
-  const safeIssuer = encodeURIComponent(ISSUER_NAME);
-  return `otpauth://totp/${safeIssuer}:${safeLabel}?secret=${secret}&issuer=${safeIssuer}`;
+  const cleanEmail = String(email || "admin@bylot.in").trim();
+  const cleanSecret = String(secret || "").trim().replace(/\s+/g, "").toUpperCase();
+  return authenticator.keyuri(cleanEmail, ISSUER_NAME, cleanSecret);
 }
 
 /**
@@ -51,8 +51,13 @@ function verifyTotp(secret, token, lastUsedTimeStep = null) {
     return { valid: false, reason: "INVALID_FORMAT" };
   }
 
+  const cleanSecret = String(secret || "").trim().replace(/\s+/g, "").toUpperCase();
+  if (!cleanSecret || cleanSecret === "[DECRYPTION_ERROR]") {
+    return { valid: false, reason: "INVALID_SECRET" };
+  }
+
   try {
-    const delta = authenticator.checkDelta(cleanToken, secret);
+    const delta = authenticator.checkDelta(cleanToken, cleanSecret);
     if (delta === null || delta === undefined) {
       return { valid: false, reason: "INVALID_CODE" };
     }

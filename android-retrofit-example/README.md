@@ -39,10 +39,10 @@ This example uses:
 const val BASE_URL = "https://192.168.1.5:5000/"
 ```
 
-It also sends this local API key header:
+It also sends this API key header (configured via environment or secure build configuration):
 
 ```http
-x-api-key: 07dad0dd8d8e9ce8ffb28f53bd4156b75b2a61e22ee67c8fa4c4bca0a93a14c0
+x-api-key: <API_KEY_FROM_SECURE_CONFIGURATION>
 ```
 
 For emulator testing, change it to:

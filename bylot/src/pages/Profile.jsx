@@ -32,7 +32,19 @@ const Profile = () => {
 
     const fetchMyItems = async () => {
         try {
-            // First get the seller profile to find the seller table ID
+            // First attempt to fetch via authenticated seller products endpoint
+            try {
+                const sellerProductsRes = await apiRequest('/api/sellers/products');
+                const products = sellerProductsRes?.data || sellerProductsRes;
+                if (Array.isArray(products)) {
+                    setMyItems(products);
+                    return;
+                }
+            } catch {
+                // fall back to public query by sellerId
+            }
+
+            // Fallback: get seller profile to query products
             let sellerId = null;
             try {
                 const sellerRes = await apiRequest('/api/sellers/profile');
@@ -52,12 +64,10 @@ const Profile = () => {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this item?')) return;
-        
         try {
             await deleteProduct(id);
             setMyItems(prev => prev.filter(item => item.id !== id));
-            alert('Item deleted successfully');
+            alert('Item deleted successfully.');
         } catch (error) {
             console.error('Error deleting item:', error);
             alert(`Error deleting item: ${error.message}`);

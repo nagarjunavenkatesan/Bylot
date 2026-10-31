@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Card from './Card';
 import { FaTrash, FaEdit, FaFlag } from 'react-icons/fa';
-import { apiRequest, getAccessToken } from '../api/backendApi';
+import { apiRequest, getAccessToken, deleteProduct } from '../api/backendApi';
+import { useAuth } from '../context/AuthContext';
 import { getProductPricing } from '../utils/pricing';
 import { formatCardExpiry } from '../utils/expiry';
 
@@ -16,12 +17,17 @@ const REPORT_REASONS = [
 ];
 
 const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete, topHeader, isSelected = false, className = '' }) => {
+    const auth = useAuth();
+    const user = auth?.user || null;
+
     // Hooks must be called unconditionally on every render
-    const [showReport, setShowReport]     = useState(false);
-    const [reason, setReason]             = useState('fake_product');
-    const [description, setDescription]  = useState('');
-    const [reporting, setReporting]       = useState(false);
-    const [reported, setReported]         = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting]           = useState(false);
+    const [showReport, setShowReport]           = useState(false);
+    const [reason, setReason]                   = useState('fake_product');
+    const [description, setDescription]        = useState('');
+    const [reporting, setReporting]             = useState(false);
+    const [reported, setReported]               = useState(false);
 
     if (!product) return null;
 
@@ -182,33 +188,151 @@ const ProductCard = ({ product, isOwner, onDelete, isAdmin, onAdminDelete, topHe
                 </Link>
 
                 {/* Owner / Admin actions */}
-                {(isOwner || isAdmin) && (
-                    <div className="owner-actions" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                        {isOwner && (
-                            <Link to={`/edit-item/${product.id}`} className="w-full">
-                                <button className="btn btn-secondary w-full" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
-                                    <FaEdit style={{ marginRight: '5px' }} /> Edit
-                                </button>
-                            </Link>
-                        )}
-                        <button
-                            type="button"
-                            className="btn btn-danger w-full"
-                            onClick={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (isAdmin && onAdminDelete) onAdminDelete(product.id, product.name);
-                                else if (onDelete) onDelete(product.id);
-                            }}
-                            style={{ padding: '8px 14px', fontSize: '0.85rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                        >
-                            <FaTrash /> Delete
-                        </button>
-                    </div>
-                )}
+                {(() => {
+                    const isSellerOwner = Boolean(
+                        user &&
+                        (user.role === 'seller' || user.role === 'admin') &&
+                        (
+                            isOwner ||
+                            (product.seller_user_id != null && Number(user.id) === Number(product.seller_user_id)) ||
+                            (product.seller_id != null && user.seller_id != null && Number(user.seller_id) === Number(product.seller_id))
+                        )
+                    );
+                    const isAuthorizedAdmin = Boolean(isAdmin && user && user.role === 'admin');
+                    const canDelete = isSellerOwner || isAuthorizedAdmin;
 
-                {/* ── Report Fraud button (shown to all non-owners) ── */}
-                {!isOwner && !isAdmin && (
+                    const handleConfirmDelete = async (e) => {
+                        if (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                        setIsDeleting(true);
+                        try {
+                            if (isAuthorizedAdmin && onAdminDelete) {
+                                await onAdminDelete(product.id, product.name);
+                            } else if (onDelete) {
+                                await onDelete(product.id);
+                            } else {
+                                await deleteProduct(product.id);
+                                alert('Item deleted successfully.');
+                            }
+                            setShowDeleteModal(false);
+                        } catch (err) {
+                            alert(err.message || 'Failed to delete item.');
+                        } finally {
+                            setIsDeleting(false);
+                        }
+                    };
+
+                    if (canDelete) {
+                        return (
+                            <>
+                                <div className="owner-actions" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                                    {isSellerOwner && (
+                                        <Link to={`/edit-item/${product.id}`} className="w-full">
+                                            <button className="btn btn-secondary w-full" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>
+                                                <FaEdit style={{ marginRight: '5px' }} /> Edit
+                                            </button>
+                                        </Link>
+                                    )}
+                                    <button
+                                        type="button"
+                                        className="btn btn-danger w-full"
+                                        onClick={e => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setShowDeleteModal(true);
+                                        }}
+                                        style={{ padding: '8px 14px', fontSize: '0.85rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                    >
+                                        <FaTrash /> Delete Item
+                                    </button>
+                                </div>
+
+                                {/* Delete Confirmation Modal */}
+                                {showDeleteModal && (
+                                    <div
+                                        className="delete-item-modal-overlay"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if (!isDeleting) setShowDeleteModal(false);
+                                        }}
+                                        role="presentation"
+                                        style={{
+                                            position: 'fixed',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                                            backdropFilter: 'blur(3px)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            zIndex: 9999,
+                                            padding: '1rem'
+                                        }}
+                                    >
+                                        <div
+                                            className="delete-item-modal"
+                                            onClick={(e) => e.stopPropagation()}
+                                            role="dialog"
+                                            aria-modal="true"
+                                            aria-labelledby={`delete-modal-title-${product.id}`}
+                                            style={{
+                                                background: 'var(--card-bg, #ffffff)',
+                                                color: 'var(--text-color, #1a1a1a)',
+                                                borderRadius: '12px',
+                                                padding: '1.5rem',
+                                                maxWidth: '420px',
+                                                width: '100%',
+                                                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25)',
+                                                border: '1px solid var(--border-color, #e5e7eb)'
+                                            }}
+                                        >
+                                            <h3 id={`delete-modal-title-${product.id}`} style={{ margin: '0 0 0.75rem 0', fontSize: '1.15rem', fontWeight: 600 }}>
+                                                Are you sure you want to delete this item?
+                                            </h3>
+                                            <p style={{ margin: '0 0 1.25rem 0', color: 'var(--text-muted, #64748b)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                                                "{product.name}" will be removed from active marketplace listings. Its historical data will be preserved in encrypted 30-day reports.
+                                            </p>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-secondary"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setShowDeleteModal(false);
+                                                    }}
+                                                    disabled={isDeleting}
+                                                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem' }}
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-danger"
+                                                    onClick={handleConfirmDelete}
+                                                    disabled={isDeleting}
+                                                    style={{ padding: '0.5rem 1rem', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                                >
+                                                    <FaTrash /> {isDeleting ? 'Deleting...' : 'Delete'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        );
+                    }
+
+                    return null;
+                })()}
+
+                {/* ── Report Fraud button (shown to non-owners & buyers) ── */}
+                {!isOwner && !isAdmin && (!user || (user.role !== 'seller' && user.role !== 'admin')) && (
                     <div className="report-fraud-section">
                         {reported ? (
                             <span className="report-sent-badge">✓ Report submitted</span>

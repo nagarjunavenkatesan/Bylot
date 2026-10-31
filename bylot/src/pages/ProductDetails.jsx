@@ -66,14 +66,22 @@ const ProductDetails = () => {
 
     const pricing = getProductPricing(product);
     const isAdmin = currentUser?.role === 'admin';
-    const isOwner = currentUser && product && currentUser.id == product.seller_id;
+    const isOwner = Boolean(
+        currentUser &&
+        (currentUser.role === 'seller' || currentUser.role === 'admin') &&
+        (
+            Number(currentUser.id) === Number(product.seller_user_id) ||
+            Number(currentUser.id) === Number(product.seller_id) ||
+            (currentUser.seller_id != null && Number(currentUser.seller_id) === Number(product.seller_id))
+        )
+    );
 
     const handleDelete = async () => {
         if (!window.confirm('Are you sure you want to delete this item?')) return;
         try {
             if (isAdmin) await adminDeleteProduct(id);
             else await deleteProduct(id);
-            alert('Item deleted successfully');
+            alert('Item deleted successfully.');
             navigate('/');
         } catch (err) {
             alert(`Error deleting item: ${err.message}`);

@@ -6,13 +6,12 @@ import { pageSEO, breadcrumbSEO } from '../utils/seo';
 
 const Terms = () => {
     const seoProps = pageSEO({
-        title: 'Terms of Service & Marketplace Guidelines – Bylot',
-        description: 'Read the terms of service, marketplace guidelines, buyer protections, and seller obligations on Bylot.',
+        title: 'Terms & Conditions',
+        description: 'Read the Terms & Conditions governing the use of Bylot, a hyperlocal marketplace connecting buyers and sellers.',
         path: '/terms',
-        keywords: 'Bylot terms, marketplace guidelines, near expiry food policy, seller terms',
         structuredData: breadcrumbSEO([
             { name: 'Home', path: '/' },
-            { name: 'Terms of Service', path: '/terms' }
+            { name: 'Terms & Conditions', path: '/terms' }
         ])
     });
 
@@ -23,41 +22,129 @@ const Terms = () => {
                 <nav aria-label="Breadcrumb" style={{ marginBottom: '1.5rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                     <Link to="/" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Home</Link>
                     <span style={{ margin: '0 0.5rem' }}>/</span>
-                    <span style={{ fontWeight: 600 }}>Terms of Service</span>
+                    <span style={{ fontWeight: 600 }}>Terms &amp; Conditions</span>
                 </nav>
 
-                <h1 className="section-title" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
-                    Terms of Service
+                <h1 className="section-title" style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>
+                    Terms &amp; Conditions
                 </h1>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                    Last updated: October 2026
+                <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontWeight: 600 }}>
+                    Last Updated: 30 October 2026
                 </p>
 
-                <div className="card" style={{ padding: '2.5rem', borderRadius: '12px', lineHeight: '1.7' }}>
-                    <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>1. Acceptance of Terms</h2>
+                <div
+                    className="card"
+                    style={{
+                        padding: 'clamp(1.5rem, 4vw, 2.5rem)',
+                        borderRadius: '12px',
+                        lineHeight: '1.7',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)'
+                    }}
+                >
+                    <p style={{ marginBottom: '1rem' }}>
+                        Welcome to <strong>Bylot</strong>, a hyperlocal marketplace that connects buyers and sellers.
+                    </p>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        By accessing or using the Bylot platform (website, application, and associated services), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
+                        By accessing or using Bylot, you agree to the following terms:
                     </p>
 
-                    <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>2. Marketplace Model &amp; Listings</h2>
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        1. Use of Bylot
+                    </h2>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        Bylot provides a hyperlocal marketplace connecting local merchants and buyers. Merchants are solely responsible for ensuring that all published near-expiry, surplus, or discounted food products comply with local food safety laws, accurate labeling, and true expiration date disclosures.
+                        You must provide accurate information and use Bylot only for lawful purposes. You are responsible for your account and activity on the Platform.
                     </p>
 
-                    <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>3. Product Safety &amp; Expiry Disclosures</h2>
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        2. Sellers
+                    </h2>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        All items listed under "Near Expiry" must be genuine, uncompromised, and within their safe consumption window. Expired products or items unfit for human consumption are strictly prohibited on Bylot.
+                        Sellers are responsible for the accuracy, legality, condition, availability, and ownership of the products they list.
                     </p>
 
-                    <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>4. Buyer Responsibilities</h2>
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        3. Buyers
+                    </h2>
                     <p style={{ marginBottom: '1.5rem' }}>
-                        Buyers are responsible for inspecting products upon collection or delivery and storing items in accordance with handling instructions.
+                        Buyers should verify product details, seller information, price, condition, and availability before completing any transaction.
                     </p>
 
-                    <h2 style={{ fontSize: '1.4rem', color: 'var(--primary)', marginBottom: '0.75rem' }}>5. Contact &amp; Inquiries</h2>
-                    <p>
-                        For questions regarding these terms, contact us at <strong>nagarjunavenkatesan@gmail.com</strong>.
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        4. Transactions
+                    </h2>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        Bylot connects buyers and sellers but <strong>does not currently process payments</strong> between users. Transactions, payments, delivery, and pickup arrangements are the responsibility of the parties involved.
                     </p>
+
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        5. Prohibited Content
+                    </h2>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        Illegal, stolen, counterfeit, fraudulent, misleading, or otherwise prohibited products and content are not allowed.
+                    </p>
+
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        6. Product Removal
+                    </h2>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        Bylot may remove or restrict listings that violate these Terms or applicable laws. Sellers may delete their own listings where the feature is available. Certain records may be retained for security, legal, audit, and reporting purposes.
+                    </p>
+
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        7. User Conduct
+                    </h2>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        Users must not misuse the Platform, attempt unauthorized access, commit fraud, upload malicious content, or interfere with Bylot's systems or security.
+                    </p>
+
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        8. Privacy
+                    </h2>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        Your use of Bylot is also governed by our{' '}
+                        <Link to="/privacy" style={{ color: 'var(--primary)', fontWeight: 600, textDecoration: 'underline' }}>
+                            Privacy Policy
+                        </Link>
+                        , which explains how your information is handled.
+                    </p>
+
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        9. Platform Availability
+                    </h2>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        We work to keep Bylot reliable, but we do not guarantee uninterrupted or error-free service.
+                    </p>
+
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        10. Changes
+                    </h2>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        We may update these Terms or Platform features from time to time. Updated Terms will be published on this page.
+                    </p>
+
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        11. Governing Law
+                    </h2>
+                    <p style={{ marginBottom: '1.5rem' }}>
+                        These Terms are governed by the laws of <strong>India</strong>, subject to applicable laws and legal rights.
+                    </p>
+
+                    <h2 style={{ fontSize: '1.35rem', color: 'var(--primary)', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+                        12. Contact
+                    </h2>
+                    <p style={{ marginBottom: '2rem' }}>
+                        For questions or concerns regarding these Terms, please contact us through the official contact information provided on Bylot.
+                    </p>
+
+                    <div style={{ paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+                        <p style={{ marginBottom: '0.75rem', fontWeight: 600 }}>
+                            By using Bylot, you acknowledge that you have read and agreed to these Terms &amp; Conditions.
+                        </p>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', fontWeight: 600 }}>
+                            &copy; 2026 Bylot. All rights reserved.
+                        </p>
+                    </div>
                 </div>
             </div>
         </PageTransition>

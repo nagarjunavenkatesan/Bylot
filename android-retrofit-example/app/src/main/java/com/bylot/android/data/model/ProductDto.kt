@@ -33,7 +33,13 @@ data class ProductDto(
     @SerializedName("city")
     val city: String? = null,
     @SerializedName("locality")
-    val locality: String? = null
+    val locality: String? = null,
+    @SerializedName("seller_id")
+    val sellerId: Long? = null,
+    @SerializedName("seller_user_id")
+    val sellerUserId: Long? = null,
+    @SerializedName("is_owner")
+    val isOwner: Boolean? = null
 )
 
 data class Product(
@@ -45,16 +51,21 @@ data class Product(
     val state: String? = null,
     val district: String? = null,
     val city: String? = null,
-    val locality: String? = null
+    val locality: String? = null,
+    val sellerId: Long? = null,
+    val sellerUserId: Long? = null,
+    val isOwner: Boolean = false
 )
 
-fun ProductDto.toDomain(baseUrl: String): Product {
+fun ProductDto.toDomain(baseUrl: String, currentUserId: Long? = null): Product {
     val raw = imageUrl ?: rawImage
     val normalizedImageUrl = when {
         raw.isNullOrBlank() -> null
         raw.startsWith("http://") || raw.startsWith("https://") -> raw
         else -> baseUrl.trimEnd('/') + "/" + raw.trimStart('/')
     }
+
+    val computedIsOwner = isOwner == true || (currentUserId != null && (sellerUserId == currentUserId || sellerId == currentUserId))
 
     return Product(
         id = id,
@@ -65,6 +76,9 @@ fun ProductDto.toDomain(baseUrl: String): Product {
         state = state,
         district = district,
         city = city,
-        locality = locality
+        locality = locality,
+        sellerId = sellerId,
+        sellerUserId = sellerUserId,
+        isOwner = computedIsOwner
     )
 }

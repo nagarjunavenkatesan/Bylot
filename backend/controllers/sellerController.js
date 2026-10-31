@@ -9,6 +9,7 @@ const { findProductById } = require("../models/productModel");
 const { publicFileUrl, deleteUploadedFile } = require("../middleware/uploadMiddleware");
 const { clearHotCache } = require("./productController");
 const { isValidStateOrUT, resolveCanonicalState } = require("../config/indiaLocations");
+const auditLogger = require("../security/auditLogger");
 
 async function requireSeller(userId) {
   const seller = await findSellerByUserId(userId);
@@ -419,20 +420,86 @@ const editProduct = asyncHandler(async (req, res) => {
 });
 
 const deleteProduct = asyncHandler(async (req, res) => {
-  const product = await findProductById(req.params.id, true);
+  const productId = req.params.id;
+  const product = await findProductById(productId, true);
   if (!product) throw new AppError("Product not found", 404);
 
+  // If already deleted
+  if (product.status === "deleted") {
+    throw new AppError("Product has already been deleted", 404);
+  }
+
   const seller = await findSellerByUserId(req.user.id);
-  const isOwner = seller && product.seller_id === seller.id;
+  const isOwner = (seller && Number(product.seller_id) === Number(seller.id)) || Number(product.seller_id) === Number(req.user.id);
   const isAdmin = req.user.role === 'admin';
   if (!isOwner && !isAdmin) {
+    auditLogger.logEvent("PRODUCT_DELETE_FORBIDDEN", req, {
+      userId: req.user.id,
+      severity: "HIGH",
+      details: {
+        productId,
+        attemptedByUserId: req.user.id,
+        actualSellerId: product.seller_id,
+        reason: "Unauthorized attempt to delete product owned by another seller"
+      }
+    });
     throw new AppError("You do not have permission to delete this product", 403);
   }
 
-  // Soft delete: set status to deleted (preserves orders history)
-  await pool.execute("UPDATE products SET status = 'deleted' WHERE id = ?", [req.params.id]);
+  const deletedAt = new Date();
+  const deletedBy = req.user.id;
+  const deletionReason = (req.body && req.body.reason) ? String(req.body.reason).trim().slice(0, 255) : "SELLER_DELETED";
+
+  // Soft delete: update status, deleted_at, deleted_by, deletion_reason (preserves order history)
+  await pool.execute(
+    "UPDATE products SET status = 'deleted', deleted_at = UTC_TIMESTAMP(), deleted_by = ?, deletion_reason = ? WHERE id = ?",
+    [deletedBy, deletionReason, productId]
+  );
+
   clearHotCache();
-  return success(res, "Product deleted successfully", null);
+
+  // Audit event logging with complete required metadata
+  auditLogger.logEvent("PRODUCT_DELETED", req, {
+    userId: req.user.id,
+    severity: "INFO",
+    details: {
+      action: "PRODUCT_DELETED",
+      productId: product.id,
+      productItemId: product.product_item_id || `PRD-${product.id}`,
+      productName: product.name,
+      sellerId: product.seller_id,
+      sellerName: product.seller_name || (seller && seller.business_name) || "Seller",
+      sellerEmail: req.user.email || null,
+      deletedByUserId: req.user.id,
+      deletedByRole: req.user.role,
+      originalCreatedAt: product.created_at,
+      deletedAt: deletedAt.toISOString(),
+      deletionDate: deletedAt.toISOString().slice(0, 10),
+      deletionTime: deletedAt.toISOString().slice(11, 19),
+      deletionReason,
+      categoryName: product.category_name,
+      sellingPrice: product.selling_price,
+      mrp: product.mrp,
+      location: {
+        country: product.country || "India",
+        state: product.state,
+        district: product.district,
+        city: product.city,
+        locality: product.locality
+      },
+      imageUrl: product.image_url || null,
+      deletionResult: "SUCCESS"
+    }
+  });
+
+  return success(res, "Item deleted successfully.", {
+    id: product.id,
+    product_item_id: product.product_item_id || `PRD-${product.id}`,
+    name: product.name,
+    status: "deleted",
+    deleted_at: deletedAt.toISOString(),
+    deleted_by: deletedBy
+  });
 });
 
 const updateInventory = asyncHandler(async (req, res) => {
@@ -462,9 +529,9 @@ const updateInventory = asyncHandler(async (req, res) => {
 const sellerDashboard = asyncHandler(async (req, res) => {
   const seller = await requireSeller(req.user.id);
   const [[productStats], [orderStats], [lowStock]] = await Promise.all([
-    pool.execute("SELECT COUNT(*) AS totalProducts, SUM(stock_quantity) AS totalStock FROM products WHERE seller_id = ?", [seller.id]),
+    pool.execute("SELECT COUNT(*) AS totalProducts, SUM(stock_quantity) AS totalStock FROM products WHERE seller_id = ? AND status != 'deleted'", [seller.id]),
     pool.execute("SELECT COUNT(*) AS totalOrders, COALESCE(SUM(grand_total), 0) AS totalSales FROM orders WHERE seller_id = ?", [seller.id]),
-    pool.execute("SELECT id, name, stock_quantity, low_stock_threshold FROM products WHERE seller_id = ? AND stock_quantity <= low_stock_threshold ORDER BY stock_quantity ASC LIMIT 10", [seller.id])
+    pool.execute("SELECT id, name, stock_quantity, low_stock_threshold FROM products WHERE seller_id = ? AND status != 'deleted' AND stock_quantity <= low_stock_threshold ORDER BY stock_quantity ASC LIMIT 10", [seller.id])
   ]);
 
   return success(res, "Seller dashboard fetched successfully", {
@@ -486,9 +553,12 @@ const listSellerProducts = asyncHandler(async (req, res) => {
   const safePage = Math.max(1, Number(page) || 1);
   const safeOffset = (safePage - 1) * safeLimit;
 
+  const includeDeleted = req.query.includeDeleted === 'true';
+  const statusFilter = includeDeleted ? "1=1" : "status != 'deleted'";
+
   const [[count], [rows]] = await Promise.all([
-    pool.query("SELECT COUNT(*) AS total FROM products WHERE seller_id = ?", [seller.id]),
-    pool.query("SELECT * FROM products WHERE seller_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?", [seller.id, safeLimit, safeOffset])
+    pool.query(`SELECT COUNT(*) AS total FROM products WHERE seller_id = ? AND ${statusFilter}`, [seller.id]),
+    pool.query(`SELECT * FROM products WHERE seller_id = ? AND ${statusFilter} ORDER BY created_at DESC LIMIT ? OFFSET ?`, [seller.id, safeLimit, safeOffset])
   ]);
   return success(res, "Seller products fetched successfully", rows, 200, buildMeta(count[0].total, safePage, safeLimit));
 });

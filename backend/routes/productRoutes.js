@@ -28,4 +28,7 @@ router.post(
   controller.reportProduct
 );
 
+// Delete product — authorized seller owner or admin
+router.delete("/:id", authenticate, validators.productId, validate, controller.deleteProduct);
+
 module.exports = router;

@@ -47,6 +47,9 @@ export default function AdminReportsTab({ adminRequest }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [deleteModal, setDeleteModal] = useState({ open: false, report: null });
+  const [subTab, setSubTab] = useState('archives');
+  const [deletedProducts, setDeletedProducts] = useState([]);
+  const [loadingDeleted, setLoadingDeleted] = useState(false);
 
   const loadReports = useCallback(async () => {
     setLoading(true);
@@ -61,9 +64,23 @@ export default function AdminReportsTab({ adminRequest }) {
     }
   }, [adminRequest]);
 
+  const loadDeletedProducts = useCallback(async () => {
+    setLoadingDeleted(true);
+    setError('');
+    try {
+      const res = await adminRequest('/api/admin/products/deleted?limit=50');
+      setDeletedProducts(res.data || []);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch deleted products.');
+    } finally {
+      setLoadingDeleted(false);
+    }
+  }, [adminRequest]);
+
   useEffect(() => {
     loadReports();
-  }, [loadReports]);
+    loadDeletedProducts();
+  }, [loadReports, loadDeletedProducts]);
 
   // Auto-poll if any report is PENDING or GENERATING
   useEffect(() => {
@@ -167,78 +184,108 @@ export default function AdminReportsTab({ adminRequest }) {
         <button
           type="button"
           className="btn btn-secondary btn-sm"
-          onClick={loadReports}
-          disabled={loading}
-          title="Refresh reports"
+          onClick={() => {
+            if (subTab === 'deleted') loadDeletedProducts();
+            else loadReports();
+          }}
+          disabled={loading || loadingDeleted}
+          title="Refresh view"
         >
-          <FaSyncAlt className={loading ? 'spin-icon' : ''} /> Refresh
+          <FaSyncAlt className={(loading || loadingDeleted) ? 'spin-icon' : ''} /> Refresh
         </button>
       </div>
 
-      {/* Generation Bar */}
-      <div className="admin-reports-generate-bar">
-        <div className="generate-controls">
-          <label htmlFor="report-period-select" className="generate-label">
-            <FaCalendarAlt /> Report Period:
-          </label>
-          <select
-            id="report-period-select"
-            className="form-input form-input-sm"
-            value={customDays ? 'custom' : selectedPeriod}
-            onChange={(e) => {
-              if (e.target.value === 'custom') {
-                setCustomDays('30');
-              } else {
-                setCustomDays('');
-                setSelectedPeriod(Number(e.target.value));
-              }
-            }}
-          >
-            <option value={7}>Last 7 Days</option>
-            <option value={14}>Last 14 Days</option>
-            <option value={30}>Last 30 Days (Default)</option>
-            <option value={60}>Last 60 Days</option>
-            <option value={90}>Last 90 Days</option>
-            <option value={180}>Last 180 Days</option>
-            <option value={365}>Last 365 Days</option>
-            <option value="custom">Custom Days…</option>
-          </select>
-
-          {customDays !== '' && (
-            <input
-              type="number"
-              className="form-input form-input-sm custom-days-input"
-              value={customDays}
-              onChange={(e) => setCustomDays(e.target.value)}
-              placeholder="Days (1-365)"
-              min={1}
-              max={365}
-            />
-          )}
-
-          <button
-            type="button"
-            className="btn btn-glow btn-sm generate-btn"
-            onClick={handleGenerate}
-            disabled={generating}
-          >
-            {generating ? (
-              <>
-                <FaSpinner className="spin-icon" /> Generating…
-              </>
-            ) : (
-              <>
-                <FaArchive /> Generate Report
-              </>
-            )}
-          </button>
-        </div>
-
-        <div className="encryption-pill">
-          <FaLock className="lock-icon" />
-          <span>AES-256-GCM Envelope Encryption Active</span>
-        </div>
+      {/* Sub-Navigation Tabs */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '1.25rem' }}>
+        <button
+          type="button"
+          className={`btn btn-sm ${subTab === 'archives' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setSubTab('archives')}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <FaArchive /> 30-Day Encrypted Archives
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${subTab === 'deleted' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => {
+            setSubTab('deleted');
+            loadDeletedProducts();
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <FaTrash /> Deleted Products History ({deletedProducts.length})
+        </button>
       </div>
+
+      {subTab === 'archives' && (
+        <>
+          {/* Generation Bar */}
+          <div className="admin-reports-generate-bar">
+            <div className="generate-controls">
+              <label htmlFor="report-period-select" className="generate-label">
+                <FaCalendarAlt /> Report Period:
+              </label>
+              <select
+                id="report-period-select"
+                className="form-input form-input-sm"
+                value={customDays ? 'custom' : selectedPeriod}
+                onChange={(e) => {
+                  if (e.target.value === 'custom') {
+                    setCustomDays('30');
+                  } else {
+                    setCustomDays('');
+                    setSelectedPeriod(Number(e.target.value));
+                  }
+                }}
+              >
+                <option value={7}>Last 7 Days</option>
+                <option value={14}>Last 14 Days</option>
+                <option value={30}>Last 30 Days (Default)</option>
+                <option value={60}>Last 60 Days</option>
+                <option value={90}>Last 90 Days</option>
+                <option value={180}>Last 180 Days</option>
+                <option value={365}>Last 365 Days</option>
+                <option value="custom">Custom Days…</option>
+              </select>
+
+              {customDays !== '' && (
+                <input
+                  type="number"
+                  className="form-input form-input-sm custom-days-input"
+                  value={customDays}
+                  onChange={(e) => setCustomDays(e.target.value)}
+                  placeholder="Days (1-365)"
+                  min={1}
+                  max={365}
+                />
+              )}
+
+              <button
+                type="button"
+                className="btn btn-glow btn-sm generate-btn"
+                onClick={handleGenerate}
+                disabled={generating}
+              >
+                {generating ? (
+                  <>
+                    <FaSpinner className="spin-icon" /> Generating…
+                  </>
+                ) : (
+                  <>
+                    <FaArchive /> Generate Report
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="encryption-pill">
+              <FaLock className="lock-icon" />
+              <span>AES-256-GCM Envelope Encryption Active</span>
+            </div>
+          </div>
+        </>
+      )}
 
       {(message || error) && (
         <div className={`admin-alert ${error ? 'error' : 'success'}`}>
@@ -247,9 +294,74 @@ export default function AdminReportsTab({ adminRequest }) {
         </div>
       )}
 
-      {/* Reports Table */}
-      <div className="admin-table-wrap">
-        <table className="admin-table admin-reports-table">
+      {subTab === 'deleted' && (
+        <div className="admin-table-wrap">
+          <table className="admin-table admin-reports-table">
+            <thead>
+              <tr>
+                <th>Product ID</th>
+                <th>Deleted Product</th>
+                <th>Seller</th>
+                <th>Created Date</th>
+                <th>Deleted Date/Time (UTC)</th>
+                <th>Location</th>
+                <th>Sale/Order Ref</th>
+                <th>Status / Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deletedProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="admin-empty">
+                    {loadingDeleted ? 'Loading deleted product records…' : 'No deleted products found in historical records.'}
+                  </td>
+                </tr>
+              ) : (
+                deletedProducts.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <span className="mono-text">{p.product_item_id || `#${p.id}`}</span>
+                    </td>
+                    <td>
+                      <strong>{p.name}</strong>
+                      {p.category_name && <small style={{ display: 'block', color: 'var(--text-muted)' }}>{p.category_name}</small>}
+                    </td>
+                    <td>
+                      <span>{p.seller_name || `Seller #${p.seller_id}`}</span>
+                    </td>
+                    <td>{formatDateDisplay(p.created_at)}</td>
+                    <td>
+                      <span className="mono-text" style={{ fontSize: '0.85rem' }}>
+                        {p.deleted_at ? new Date(p.deleted_at).toISOString().replace('T', ' ').substring(0, 19) + ' UTC' : 'N/A'}
+                      </span>
+                    </td>
+                    <td>
+                      {[p.locality, p.city, p.district, p.state].filter(Boolean).join(', ') || 'N/A'}
+                    </td>
+                    <td>
+                      {p.latest_order_number ? (
+                        <span className="badge badge-info">{p.latest_order_number}</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="status-badge status-deleted" style={{ textTransform: 'uppercase' }}>
+                        {p.deletion_reason || p.status || 'DELETED'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {subTab === 'archives' && (
+        /* Reports Table */
+        <div className="admin-table-wrap">
+          <table className="admin-table admin-reports-table">
           <thead>
             <tr>
               <th>Report ID</th>
@@ -360,6 +472,7 @@ export default function AdminReportsTab({ adminRequest }) {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Delete Confirmation Modal (Prompt Section 24) */}
       {deleteModal.open && (

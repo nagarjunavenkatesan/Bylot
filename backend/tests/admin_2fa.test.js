@@ -610,4 +610,51 @@ describe("Admin Two-Factor Authentication (2FA) - 28 Production Validation Tests
     expect(adminAccessRes.status).toBe(200);
     expect(adminAccessRes.body.success).toBe(true);
   });
+
+  // 29. RFC 6238 standard test vectors verification (Appendix B)
+  test("29. RFC 6238 standard test vectors generate expected 6-digit TOTP codes", () => {
+    const rfcSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"; // 20-byte ASCII "12345678901234567890"
+    const authAt59 = authenticator.clone({ epoch: 59 * 1000 });
+    expect(authAt59.generate(rfcSecret)).toBe("287082");
+
+    const authAt1111111109 = authenticator.clone({ epoch: 1111111109 * 1000 });
+    expect(authAt1111111109.generate(rfcSecret)).toBe("081804");
+  });
+
+  // 30. Stored encrypted secret -> decrypt -> verify known code regression test
+  test("30. Stored encrypted secret in DB decrypts cleanly and verifies valid Google Authenticator code", async () => {
+    const testSecret = "JBSWY3DPEHPK3PXP"; // Standard Base32 secret
+    const encrypted = cryptoUtil.encryptPII(testSecret);
+    const decrypted = cryptoUtil.decryptPII(encrypted);
+
+    expect(decrypted).toBe(testSecret);
+    const code = authenticator.generate(decrypted);
+    const result = twoFactorService.verifyTotp(decrypted, code);
+    expect(result.valid).toBe(true);
+  });
+
+  // 31. Multi-key resilience: Encrypted with ENCRYPTION_KEY decrypts even when REPORT_ENCRYPTION_KEY is present
+  test("31. Decrypts secret encrypted with ENCRYPTION_KEY even when REPORT_ENCRYPTION_KEY is set", async () => {
+    const testSecret = "AZMXCXKKPFQHEPSP";
+    const encKeyBuf = process.env.ENCRYPTION_KEY || "dev_encryption_master_key_32bytes_long_entropy_ok";
+    const encryptedWithEncKey = cryptoUtil.encryptPII(testSecret, encKeyBuf);
+
+    const decrypted = cryptoUtil.decryptPII(encryptedWithEncKey);
+    expect(decrypted).toBe(testSecret);
+
+    const validCode = authenticator.generate(testSecret);
+    const verifyRes = twoFactorService.verifyTotp(decrypted, validCode);
+    expect(verifyRes.valid).toBe(true);
+  });
+
+  // 32. Key URI generation produces RFC-compliant URI with period, digits, and algorithm
+  test("32. generateProvisioningUri generates valid RFC 6238 Google Authenticator URI", () => {
+    const uri = twoFactorService.generateProvisioningUri("admin@bylot.in", "AZMXCXKKPFQHEPSP");
+    expect(uri).toContain("otpauth://totp/Bylot:admin%40bylot.in");
+    expect(uri).toContain("secret=AZMXCXKKPFQHEPSP");
+    expect(uri).toContain("issuer=Bylot");
+    expect(uri).toContain("digits=6");
+    expect(uri).toContain("period=30");
+    expect(uri).toContain("algorithm=SHA1");
+  });
 });

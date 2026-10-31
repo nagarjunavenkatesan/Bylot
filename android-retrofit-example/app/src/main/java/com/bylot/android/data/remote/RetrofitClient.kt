@@ -19,6 +19,8 @@ object RetrofitClient {
     val BASE_URL: String = BuildConfig.API_BASE_URL
     // Pass API key via environment / secure configuration rather than hardcoding
     private val API_KEY: String get() = System.getProperty("BYLOT_API_KEY") ?: ""
+    @Volatile
+    var authToken: String? = null
 
     private val loggingInterceptor: HttpLoggingInterceptor by lazy {
         HttpLoggingInterceptor().apply {
@@ -32,13 +34,17 @@ object RetrofitClient {
             .readTimeout(20, TimeUnit.SECONDS)
             .writeTimeout(20, TimeUnit.SECONDS)
             .addInterceptor { chain ->
-                val request = chain.request()
+                val requestBuilder = chain.request()
                     .newBuilder()
                     .addHeader("x-api-key", API_KEY)
                     .addHeader("x-client-platform", "android")
                     .addHeader("X-Requested-With", "bylot")
-                    .build()
-                chain.proceed(request)
+
+                authToken?.takeIf { it.isNotBlank() }?.let { token ->
+                    requestBuilder.addHeader("Authorization", "Bearer $token")
+                }
+
+                chain.proceed(requestBuilder.build())
             }
             .addInterceptor(loggingInterceptor)
             .build()

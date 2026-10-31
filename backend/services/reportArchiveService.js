@@ -204,6 +204,108 @@ async function fetchProductData(startDate, endDate) {
   }));
 }
 
+async function fetchDeletedProductData(startDate, endDate) {
+  const normDate = (val, isEnd) => {
+    if (!val) return isEnd ? '2099-12-31 23:59:59' : '1970-01-01 00:00:00';
+    if (val instanceof Date) {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${val.getUTCFullYear()}-${pad(val.getUTCMonth() + 1)}-${pad(val.getUTCDate())} ${pad(val.getUTCHours())}:${pad(val.getUTCMinutes())}:${pad(val.getUTCSeconds())}`;
+    }
+    const str = String(val).trim();
+    if (str.includes('T')) {
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+      }
+    }
+    return str;
+  };
+
+  const sDate = normDate(startDate, false);
+  const eDate = normDate(endDate, true);
+
+  const [rows] = await pool.query(
+    `SELECT p.id, p.product_item_id, p.seller_id, p.category_id, p.name, p.description,
+            p.sku, p.brand, p.mrp, p.selling_price, p.discount_percent, p.stock_quantity,
+            p.low_stock_threshold, p.expiry_date, p.manufacture_date, p.batch_number,
+            p.product_type, p.image_url, p.status, p.country, p.state, p.district, p.city, p.locality,
+            p.created_at, p.updated_at, p.deleted_at, p.deleted_by, p.deletion_reason,
+            c.name AS category_name, s.business_name AS seller_name, s.contact_email AS seller_email,
+            del_u.name AS deleted_by_name, del_u.email AS deleted_by_email,
+            (
+              SELECT o.order_number 
+              FROM order_items oi 
+              JOIN orders o ON o.id = oi.order_id 
+              WHERE oi.product_id = p.id 
+              ORDER BY o.created_at DESC 
+              LIMIT 1
+            ) AS order_reference
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     LEFT JOIN sellers s ON s.id = p.seller_id
+     LEFT JOIN users del_u ON del_u.id = p.deleted_by
+     WHERE p.status = 'deleted'
+       AND (
+         (p.deleted_at IS NOT NULL AND p.deleted_at BETWEEN ? AND ?)
+         OR (p.deleted_at IS NULL AND p.updated_at BETWEEN ? AND ?)
+       )
+     ORDER BY p.deleted_at DESC, p.id ASC`,
+    [sDate, eDate, sDate, eDate]
+  );
+
+  return rows.map((p) => {
+    const delDateObj = p.deleted_at ? new Date(p.deleted_at) : new Date(p.updated_at);
+    return {
+      product_id: p.id,
+      product_item_id: p.product_item_id || `PRD-${p.id}`,
+      productId: p.product_item_id || `PRD-${p.id}`,
+      product_title: p.name,
+      productTitle: p.name,
+      title: p.name,
+      name: p.name,
+      seller_id: p.seller_id,
+      sellerId: p.seller_id,
+      seller_name: p.seller_name,
+      sellerName: p.seller_name,
+      seller_email: p.seller_email || null,
+      sellerEmail: p.seller_email || null,
+      category_id: p.category_id,
+      category_name: p.category_name,
+      sku: p.sku,
+      brand: p.brand,
+      mrp: Number(p.mrp),
+      price: Number(p.selling_price),
+      selling_price: Number(p.selling_price),
+      discount_percent: Number(p.discount_percent),
+      stock_quantity: p.stock_quantity,
+      product_type: p.product_type,
+      image_url: p.image_url,
+      status: "DELETED",
+      created_at: p.created_at,
+      createdAt: p.created_at,
+      deleted_at: delDateObj.toISOString(),
+      deletedAt: delDateObj.toISOString(),
+      deletion_date: formatDate(delDateObj),
+      deletion_time: delDateObj.toISOString().slice(11, 19),
+      deleted_by: p.deleted_by,
+      deletedBy: p.deleted_by,
+      deleted_by_name: p.deleted_by_name || null,
+      deleted_by_email: p.deleted_by_email || null,
+      deletion_reason: p.deletion_reason || "Seller sold item deletion",
+      order_reference: p.order_reference || null,
+      orderReference: p.order_reference || null,
+      location: {
+        country: p.country || "India",
+        state: p.state,
+        district: p.district,
+        city: p.city,
+        locality: p.locality
+      }
+    };
+  });
+}
+
 /**
  * Query sanitized order data.
  */
@@ -314,6 +416,32 @@ async function fetchAuditLogData(startDate, endDate) {
       path: log.path,
       method: log.method,
       details: log.details
+    }));
+}
+
+/**
+ * Query sanitized product deletion audit events.
+ */
+async function fetchProductDeletionAuditData(startDate, endDate) {
+  const recentLogs = auditLogger.getRecentLogs(500);
+  const startMs = new Date(startDate).getTime();
+  const endMs = new Date(endDate).getTime();
+
+  return recentLogs
+    .filter((log) => {
+      if (log.type !== "PRODUCT_DELETED") return false;
+      const logMs = new Date(log.timestamp).getTime();
+      return logMs >= startMs && logMs <= endMs;
+    })
+    .map((log) => ({
+      id: log.id,
+      timestamp: log.timestamp,
+      action: "PRODUCT_DELETED",
+      severity: log.severity,
+      user_id: log.userId,
+      ip: log.ip,
+      userAgent: log.userAgent,
+      details: typeof log.details === "string" ? (() => { try { return JSON.parse(log.details); } catch { return log.details; } })() : log.details
     }));
 }
 
@@ -499,25 +627,30 @@ async function executeReportGenerationJob(reportRecordId, reportId, startDateStr
     const endIso = `${endDateStr} 23:59:59`;
 
     // 3. Collect sanitized evidence datasets
-    const [buyers, sellers, products, orders, complaints, auditLogs] = await Promise.all([
+    const [buyers, sellers, products, deletedProducts, orders, complaints, auditLogs, productDeletionAudits] = await Promise.all([
       fetchBuyerData(startIso, endIso),
       fetchSellerData(startIso, endIso),
       fetchProductData(startIso, endIso),
+      fetchDeletedProductData(startIso, endIso),
       fetchOrderData(startIso, endIso),
       fetchComplaintData(startIso, endIso),
-      fetchAuditLogData(startIso, endIso)
+      fetchAuditLogData(startIso, endIso),
+      fetchProductDeletionAuditData(startIso, endIso)
     ]);
 
-    // 4. Compress evidence images into WebP
-    const imagesCount = await processReportImages(products, path.join(jobTempDir, "images"));
+    // 4. Compress evidence images into WebP (including deleted product evidence images)
+    const allProductsForImages = [...products, ...deletedProducts];
+    const imagesCount = await processReportImages(allProductsForImages, path.join(jobTempDir, "images"));
 
     // 5. Write structured evidence JSON files
     fs.writeFileSync(path.join(jobTempDir, "buyers", "buyer-data.json"), JSON.stringify(buyers, null, 2), "utf8");
     fs.writeFileSync(path.join(jobTempDir, "sellers", "seller-data.json"), JSON.stringify(sellers, null, 2), "utf8");
     fs.writeFileSync(path.join(jobTempDir, "products", "product-data.json"), JSON.stringify(products, null, 2), "utf8");
+    fs.writeFileSync(path.join(jobTempDir, "products", "deleted-products.json"), JSON.stringify(deletedProducts, null, 2), "utf8");
     fs.writeFileSync(path.join(jobTempDir, "orders", "order-data.json"), JSON.stringify(orders, null, 2), "utf8");
     fs.writeFileSync(path.join(jobTempDir, "reports", "complaints.json"), JSON.stringify(complaints, null, 2), "utf8");
     fs.writeFileSync(path.join(jobTempDir, "audit", "admin-actions.json"), JSON.stringify(auditLogs, null, 2), "utf8");
+    fs.writeFileSync(path.join(jobTempDir, "audit", "product-deletion-actions.json"), JSON.stringify(productDeletionAudits, null, 2), "utf8");
 
     // 6. Generate README.txt
     const readmeText = `================================================================================
@@ -528,15 +661,17 @@ Generated: ${new Date().toISOString()}
 Standard: AES-256-GCM Envelope Encryption
 ================================================================================
 Contents:
-- buyers/buyer-data.json       : Sanitized buyer evidence records
-- sellers/seller-data.json     : Sanitized seller profiles & performance
-- products/product-data.json   : Product listings & location hierarchy
-- orders/order-data.json       : Orders & delivery references (Direct fulfillment)
-- reports/complaints.json      : Product disputes & dispute logs
-- audit/admin-actions.json     : Administrative action audit records
-- images/                      : Compressed WebP evidence images & thumbnails
-- manifest.json                : Cryptographic manifest and integrity metadata
-- checksums.sha256             : SHA-256 checksums for internal files
+- buyers/buyer-data.json              : Sanitized buyer evidence records
+- sellers/seller-data.json            : Sanitized seller profiles & performance
+- products/product-data.json          : Product listings & location hierarchy
+- products/deleted-products.json      : Seller deleted & sold item historical records & timestamps
+- orders/order-data.json              : Orders & delivery references (Direct fulfillment)
+- reports/complaints.json             : Product disputes & dispute logs
+- audit/admin-actions.json            : Administrative action audit records
+- audit/product-deletion-actions.json : Product deletion audit event trail
+- images/                             : Compressed WebP evidence images & thumbnails
+- manifest.json                       : Cryptographic manifest and integrity metadata
+- checksums.sha256                    : SHA-256 checksums for internal files
 ================================================================================`;
     fs.writeFileSync(path.join(jobTempDir, "README.txt"), readmeText, "utf8");
 
@@ -572,7 +707,7 @@ Contents:
       },
       created_at: new Date().toISOString(),
       application_version: "1.0.0",
-      schema_version: "0007",
+      schema_version: "0008",
       encryption_algorithm: "AES-256-GCM",
       encryption_version: "1.0",
       image_processing_version: "sharp-webp-v1",
@@ -580,9 +715,11 @@ Contents:
         buyers: buyers.length,
         sellers: sellers.length,
         products: products.length,
+        deleted_products: deletedProducts.length,
         orders: orders.length,
         complaints: complaints.length,
         audit_logs: auditLogs.length,
+        product_deletion_audits: productDeletionAudits.length,
         images_processed: imagesCount
       },
       files: fileChecksums
@@ -953,5 +1090,7 @@ module.exports = {
   streamDecryptedArchive,
   deleteReportArchive,
   cleanExpiredArchives,
+  fetchDeletedProductData,
+  fetchProductDeletionAuditData,
   formatDate
 };

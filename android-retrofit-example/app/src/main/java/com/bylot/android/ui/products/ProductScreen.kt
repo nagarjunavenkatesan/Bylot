@@ -14,18 +14,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -41,13 +49,30 @@ fun ProductScreen(
     viewModel: ProductViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var productToDelete by remember { mutableStateOf<Product?>(null) }
+
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessages()
+        }
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessages()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(text = "Bylot Products") }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -61,7 +86,7 @@ fun ProductScreen(
                     )
                 }
 
-                uiState.errorMessage != null -> {
+                uiState.errorMessage != null && uiState.products.isEmpty() -> {
                     ErrorState(
                         message = uiState.errorMessage.orEmpty(),
                         onRetry = viewModel::loadProducts,
@@ -77,15 +102,57 @@ fun ProductScreen(
                 }
 
                 else -> {
-                    ProductList(products = uiState.products)
+                    ProductList(
+                        products = uiState.products,
+                        onDeleteClick = { product ->
+                            productToDelete = product
+                        }
+                    )
                 }
             }
+        }
+
+        productToDelete?.let { product ->
+            AlertDialog(
+                onDismissRequest = { productToDelete = null },
+                title = { Text(text = "Are you sure you want to delete this item?") },
+                text = {
+                    Text(text = "\"${product.name}\" will be removed from active marketplace listings. Historical reports will be safely preserved.")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val id = product.id
+                            productToDelete = null
+                            viewModel.deleteProduct(id)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text(text = "Delete")
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { productToDelete = null },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        )
+                    ) {
+                        Text(text = "Cancel")
+                    }
+                }
+            )
         }
     }
 }
 
 @Composable
-private fun ProductList(products: List<Product>) {
+private fun ProductList(
+    products: List<Product>,
+    onDeleteClick: (Product) -> Unit
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -95,47 +162,70 @@ private fun ProductList(products: List<Product>) {
             items = products,
             key = { product -> product.id }
         ) { product ->
-            ProductCard(product = product)
+            ProductCard(
+                product = product,
+                onDeleteClick = onDeleteClick
+            )
         }
     }
 }
 
 @Composable
-private fun ProductCard(product: Product) {
+private fun ProductCard(
+    product: Product,
+    onDeleteClick: (Product) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(12.dp)
         ) {
-            AsyncImage(
-                model = product.imageUrl,
-                contentDescription = product.name,
-                modifier = Modifier.size(72.dp),
-                contentScale = ContentScale.Crop
-            )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = product.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                AsyncImage(
+                    model = product.imageUrl,
+                    contentDescription = product.name,
+                    modifier = Modifier.size(72.dp),
+                    contentScale = ContentScale.Crop
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "₹${product.price}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp)
+                ) {
+                    Text(
+                        text = product.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "₹${product.price}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            if (product.isOwner) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { onDeleteClick(product) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(text = "Delete Item")
+                }
             }
         }
     }

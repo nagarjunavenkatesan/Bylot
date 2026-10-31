@@ -140,6 +140,7 @@ describe("General Security, Sanitization and Resilience", () => {
     const originalDbPassword = process.env.DB_PASSWORD;
     const originalJwtSecret = process.env.JWT_SECRET;
     const originalAccessSecret = process.env.JWT_ACCESS_SECRET;
+    const originalSkipSmtp = process.env.SKIP_SMTP_CHECK;
     try {
       jest.resetModules();
       process.env.NODE_ENV = "production";
@@ -149,8 +150,9 @@ describe("General Security, Sanitization and Resilience", () => {
       process.env.DB_PASSWORD = "production_db_password_entropy_ok_12345";
       process.env.JWT_REFRESH_SECRET = "production_refresh_secret_min_32_characters_long_entropy_ok";
       process.env.CORS_ORIGINS = "https://bylot.in";
-      process.env.JWT_SECRET = "short"; // Too short (< 32 chars)
-      delete process.env.JWT_ACCESS_SECRET;
+      process.env.SKIP_SMTP_CHECK = "true";
+      process.env.JWT_ACCESS_SECRET = "short"; // Too short (< 32 chars)
+      process.env.JWT_SECRET = "short";
 
       expect(() => {
         require("../config/env");
@@ -161,8 +163,49 @@ describe("General Security, Sanitization and Resilience", () => {
       process.env.DB_PASSWORD = originalDbPassword;
       process.env.JWT_SECRET = originalJwtSecret;
       process.env.JWT_ACCESS_SECRET = originalAccessSecret;
+      if (originalSkipSmtp !== undefined) {
+        process.env.SKIP_SMTP_CHECK = originalSkipSmtp;
+      } else {
+        delete process.env.SKIP_SMTP_CHECK;
+      }
       jest.resetModules();
       require("../config/env"); // Restore
+    }
+  });
+
+  test("App refuses to start in production if REPORT_ENCRYPTION_KEY is missing or too short", () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalReportKey = process.env.REPORT_ENCRYPTION_KEY;
+    const originalEncKey = process.env.ENCRYPTION_KEY;
+    const originalSkipSmtp = process.env.SKIP_SMTP_CHECK;
+    try {
+      jest.resetModules();
+      process.env.NODE_ENV = "production";
+      process.env.DB_HOST = "localhost";
+      process.env.DB_USER = "root";
+      process.env.DB_NAME = "bylot_test";
+      process.env.DB_PASSWORD = "production_db_password_entropy_ok_12345";
+      process.env.JWT_ACCESS_SECRET = "production_access_secret_min_32_characters_long_entropy_ok";
+      process.env.JWT_REFRESH_SECRET = "production_refresh_secret_min_32_characters_long_entropy_ok";
+      process.env.CORS_ORIGINS = "https://bylot.in";
+      process.env.SKIP_SMTP_CHECK = "true";
+      process.env.REPORT_ENCRYPTION_KEY = "";
+      process.env.ENCRYPTION_KEY = "";
+
+      expect(() => {
+        require("../config/env");
+      }).toThrow(/REPORT_ENCRYPTION_KEY is required in production/);
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      if (originalReportKey !== undefined) process.env.REPORT_ENCRYPTION_KEY = originalReportKey;
+      if (originalEncKey !== undefined) process.env.ENCRYPTION_KEY = originalEncKey;
+      if (originalSkipSmtp !== undefined) {
+        process.env.SKIP_SMTP_CHECK = originalSkipSmtp;
+      } else {
+        delete process.env.SKIP_SMTP_CHECK;
+      }
+      jest.resetModules();
+      require("../config/env");
     }
   });
 

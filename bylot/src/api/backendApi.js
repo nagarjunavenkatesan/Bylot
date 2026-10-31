@@ -419,6 +419,7 @@ export function normalizeProduct(product) {
         distance: product.distance != null ? Number(product.distance) : (product.distance_km != null ? Number(product.distance_km) : null),
         category: product.category ?? product.category_name ?? 'All',
         seller_id: product.seller_id || product.sellerId || 1,
+        seller_user_id: product.seller_user_id || product.sellerUserId || null,
         seller_name: product.seller_name || product.business_name || 'Bylot Verified Seller',
         description: product.description || 'Quality near-expiry product available at discounted rates.'
     };

@@ -3,7 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { PassThrough } = require("stream");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
-const env = require("../config/env");
+const _env = require("../config/env");
 const reportArchiveService = require("../services/reportArchiveService");
 const { pool } = require("../config/db");
 const { getMasterKey, decryptPII } = require("../security/cryptoUtil");

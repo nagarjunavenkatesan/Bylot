@@ -61,6 +61,9 @@ function runSecurityAudit({ quiet = false } = {}) {
       if (!env.corsOrigins || env.corsOrigins.length === 0) {
         failures.push("CORS_ORIGINS cannot be empty in production.");
       }
+      if (!env.reportEncryptionKey || env.reportEncryptionKey.length < 32) {
+        failures.push("REPORT_ENCRYPTION_KEY must be configured in production (minimum 32 characters).");
+      }
     } else {
       passes.push("Development environment configuration verified.");
     }

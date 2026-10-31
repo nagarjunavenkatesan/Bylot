@@ -44,7 +44,7 @@ const Footer = () => {
                         <li><Link to="/about" style={{ color: 'inherit', textDecoration: 'none' }}>About Us</Link></li>
                         <li><Link to="/faq" style={{ color: 'inherit', textDecoration: 'none' }}>FAQ &amp; Help</Link></li>
                         <li><Link to="/contact" style={{ color: 'inherit', textDecoration: 'none' }}>Contact Us</Link></li>
-                        <li><Link to="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>Terms of Service</Link></li>
+                        <li><Link to="/terms" style={{ color: 'inherit', textDecoration: 'none' }}>Terms &amp; Conditions</Link></li>
                         <li><Link to="/privacy" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy Policy</Link></li>
                     </ul>
                 </div>

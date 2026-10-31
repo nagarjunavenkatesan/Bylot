@@ -73,7 +73,7 @@ Admin Password Login (Returns 2FA Challenge):
 ```bash
 curl -X POST "$BASE_URL/api/admin/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@bylot.in","password":"AdminPass123!"}'
+  -d '{"email":"admin@bylot.in","password":"<SECURE_ADMIN_PASSWORD>"}'
 # Response: {"success":true,"message":"Two-step verification required","data":{"requires2FA":true,"challengeId":"<CHALLENGE_ID>","expiresIn":300}}
 ```
 

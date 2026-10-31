@@ -117,6 +117,7 @@ class AuditLogger {
       case "TOKEN_REVOKED_USAGE":
       case "SUSPICIOUS_PAYLOAD":
       case "REPORT_GENERATION_FAILED":
+      case "PRODUCT_DELETE_FORBIDDEN":
         return "HIGH";
       case "ACCOUNT_LOCKED":
       case "IP_BLOCKED":
@@ -129,6 +130,7 @@ class AuditLogger {
       case "REPORT_CREATED":
       case "REPORT_DOWNLOAD":
       case "REPORT_AUTO_EXPIRED":
+      case "PRODUCT_DELETED":
         return "INFO";
       default:
         return "INFO";

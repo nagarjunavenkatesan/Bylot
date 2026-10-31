@@ -47,6 +47,9 @@ node backend/scripts/migrate.js --db bylot_test
 | `0003_auth_security_tokens.sql` | Adds `token_version`, email verification columns, and creates multi-device `refresh_tokens` table. Automatically marks existing users verified. | Drop `refresh_tokens` table and drop added columns. |
 | `0004_performance_indexes.sql` | Adds composite indexes and FULLTEXT search index `idx_products_ft` on `(name, brand, description)` and ensures status supports `deleted`. | Drop indexes via `ALTER TABLE ... DROP INDEX ...` |
 | `0005_persistent_token_blacklist.sql` | Creates persistent `token_blacklist` table for cross-restart token revocation. | `DROP TABLE IF EXISTS token_blacklist` |
+| `0006_admin_2fa.sql` | Adds TOTP 2FA secret and recovery code hashes to `users` for Admin Google Authenticator. | `ALTER TABLE users DROP COLUMN totp_secret, DROP COLUMN totp_enabled, DROP COLUMN totp_recovery_codes` |
+| `0007_admin_reports_and_locations.sql` | Creates `admin_report_archives` table and adds All-India canonical location columns and indexes (`country`, `state`, `district`, `locality`). | `DROP TABLE IF EXISTS admin_report_archives` |
+| `0008_seller_product_delete_audit.sql` | Adds `deleted_at`, `deleted_by`, and `deletion_reason` columns to `products` for seller soft-deletion and auditing. | `ALTER TABLE products DROP COLUMN deleted_at, DROP COLUMN deleted_by, DROP COLUMN deletion_reason` |
 
 ---
 

@@ -341,7 +341,7 @@ const logout = asyncHandler(async (req, res) => {
   }
 
   if (req.token) {
-    tokenBlacklist.blacklist(req.token, Date.now() + 24 * 60 * 60 * 1000, req);
+    await tokenBlacklist.blacklist(req.token, Date.now() + 24 * 60 * 60 * 1000, req);
   }
 
   clearRefreshTokenCookie(res);

@@ -322,6 +322,11 @@ const reportProduct = asyncHandler(async (req, res) => {
   return success(res, "Fraud report submitted. Our team will review it shortly.", null, 201);
 });
 
+const deleteProduct = asyncHandler(async (req, res, next) => {
+  const sellerController = require("./sellerController");
+  return sellerController.deleteProduct(req, res, next);
+});
+
 module.exports = {
   getAllProducts,
   getProductById,
@@ -331,5 +336,6 @@ module.exports = {
   nearExpiryProducts,
   nearbyProducts,
   reportProduct,
+  deleteProduct,
   clearHotCache
 };

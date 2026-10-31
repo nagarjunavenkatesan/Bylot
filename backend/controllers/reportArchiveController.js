@@ -2,7 +2,6 @@ const asyncHandler = require("../utils/asyncHandler");
 const { success } = require("../utils/apiResponse");
 const AppError = require("../utils/AppError");
 const reportArchiveService = require("../services/reportArchiveService");
-const auditLogger = require("../security/auditLogger");
 
 /**
  * List generated reports and archives.

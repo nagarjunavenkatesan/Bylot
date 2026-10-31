@@ -14,31 +14,35 @@ if (isProduction) {
   required.push("DB_PASSWORD");
 }
 
-const KNOWN_DEFAULTS = [
+const KNOWN_DEFAULT_EXACT = [
   "secret",
   "default",
   "change_me",
-  "replace_with",
+  "changeme",
   "password",
-  "12345678",
   "password123",
+  "admin",
+  "admin123",
+  "12345678",
+  "123456789",
+  "your_secure_db_password"
+];
+
+const KNOWN_DEFAULT_PATTERNS = [
+  "change_me",
+  "replace_with",
   "your_secure_db_password",
-  "replace_with_a_long_random_access_secret",
-  "replace_with_a_long_random_refresh_secret",
-  "replace_with_a_long_random_jwt_secret",
-  "bylot_secure_pass_4014",
-  "bylot_root_secret_4014",
-  "@bvnd4014bv",
-  "bvnd",
-  "bvnd4014",
-  "4014",
-  "adminpass123!"
+  "replace_with_a_long_random"
 ];
 
 function isKnownDefault(val) {
-  if (!val) return true;
-  const lower = String(val).toLowerCase();
-  return KNOWN_DEFAULTS.some(d => lower.includes(d));
+  if (!val || typeof val !== "string") return true;
+  const lower = val.trim().toLowerCase();
+  if (lower.length < 8) return true;
+  if (/^(.)\1+$/.test(lower)) return true; // all repeating characters
+  if (/^(12345678|abcdefgh|qwertyuiop)/i.test(lower)) return true; // common keyboard sequence
+  if (KNOWN_DEFAULT_EXACT.includes(lower)) return true;
+  return KNOWN_DEFAULT_PATTERNS.some(d => lower.includes(d));
 }
 
 if (!isProduction) {
@@ -64,7 +68,7 @@ if (isProduction) {
   const accessSec = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "";
   const refreshSec = process.env.JWT_REFRESH_SECRET || "";
   const dbPass = process.env.DB_PASSWORD || "";
-  const encKey = process.env.ENCRYPTION_KEY || "";
+  const reportEncKey = process.env.REPORT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY || "";
 
   if (accessSec.length < 32 || isKnownDefault(accessSec)) {
     throw new Error("[FATAL] JWT_SECRET must be at least 32 characters and not a known default");
@@ -78,8 +82,8 @@ if (isProduction) {
   if (isKnownDefault(dbPass)) {
     throw new Error("[FATAL] DB_PASSWORD is using an insecure or known default password");
   }
-  if (!encKey || encKey.length < 32 || isKnownDefault(encKey)) {
-    throw new Error("[FATAL] ENCRYPTION_KEY is required in production, must be at least 32 characters, and not a known default");
+  if (!reportEncKey || reportEncKey.length < 32 || isKnownDefault(reportEncKey)) {
+    throw new Error("[FATAL] REPORT_ENCRYPTION_KEY is required in production, must be at least 32 characters, and not a known default");
   }
   if (!process.env.SKIP_SMTP_CHECK && (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS)) {
     throw new Error("[FATAL] SMTP configuration is required in production (SMTP_HOST, SMTP_USER, SMTP_PASS must be set). Set SKIP_SMTP_CHECK=true in .env if testing or hosting without mail service.");
@@ -140,5 +144,6 @@ module.exports = {
   adminEmail: process.env.ADMIN_EMAIL || "",
   reportPeriodDays: Number(process.env.REPORT_PERIOD_DAYS || 30),
   archiveRetentionDays: Number(process.env.ARCHIVE_RETENTION_DAYS || 365),
+  encryptionKey: process.env.ENCRYPTION_KEY || process.env.REPORT_ENCRYPTION_KEY || "",
   reportEncryptionKey: process.env.REPORT_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY || ""
 };

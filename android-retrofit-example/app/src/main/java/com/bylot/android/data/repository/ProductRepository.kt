@@ -41,4 +41,19 @@ class ProductRepository(
             )
         }
     }
+
+    suspend fun deleteProduct(id: Long): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.deleteProduct(id)
+            if (response.isSuccessful) {
+                ApiResult.Success(Unit)
+            } else {
+                ApiResult.Error("Failed to delete product (${response.code()}): ${response.message()}")
+            }
+        } catch (exception: IOException) {
+            ApiResult.Error("Cannot connect to backend to delete product.", exception)
+        } catch (exception: Exception) {
+            ApiResult.Error(exception.message ?: "Error deleting product.", exception)
+        }
+    }
 }

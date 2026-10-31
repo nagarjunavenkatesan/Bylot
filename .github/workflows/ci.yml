@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["**"]
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend Lint, Audit, Test & Security
@@ -15,18 +18,32 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || 'ci_test_password_change_me' }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
           MYSQL_DATABASE: bylot_test
         ports:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
 
     env:
-      CI_MYSQL_PWD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || 'ci_test_password_change_me' }}
+      CI_MYSQL_PWD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Validate Required CI Secrets
+        run: |
+          if [ -z "${{ secrets.CI_MYSQL_ROOT_PASSWORD }}" ]; then
+            echo "::error::Required secret CI_MYSQL_ROOT_PASSWORD is missing in repository settings. Failing CI."
+            exit 1
+          fi
+
+      - name: Generate Ephemeral Test Secrets
+        run: |
+          echo "JWT_ACCESS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "JWT_REFRESH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "SESSION_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "REPORT_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Block Telegram code
         run: |
@@ -46,22 +63,22 @@ jobs:
             exit 1
           fi
           # 2. Block active payment routes and webhooks
-          if git grep -i -E "\.(get|post|put|patch|delete)\s*\(['\"].*(/payment|/checkout|/webhook)" -- ":!*.test.js" ":!*.md"; then
+          if git grep -i -E "\.(get|post|put|patch|delete)\s*\(['\"].*(/payment|/checkout|/webhook)" -- ":!*.test.js" ":!.github/**" ":!*.md"; then
             echo "Error: Active payment or checkout API routes found!"
             exit 1
           fi
           # 3. Block client payment initiation and gateway calls
-          if git grep -i -E "\b(makePayment|payNow|verifyPayment|processPayment|initiatePayment|new Razorpay|new Stripe|loadStripe)\s*\(" -- ":!*.test.js" ":!*.md"; then
+          if git grep -i -E "\b(makePayment|payNow|verifyPayment|processPayment|initiatePayment|new Razorpay|new Stripe|loadStripe)\s*\(" -- ":!*.test.js" ":!.github/**" ":!*.md"; then
             echo "Error: Payment function calls found!"
             exit 1
           fi
           # 4. Block payment credentials / environment variables
-          if git grep -i -E "\b(RAZORPAY_|STRIPE_|PAYPAL_|CASHFREE_)(KEY|SECRET|TOKEN|ID|WEBHOOK)" -- ":!*.test.js" ":!*.md"; then
+          if git grep -i -E "\b(RAZORPAY_|STRIPE_|PAYPAL_|CASHFREE_)(KEY|SECRET|TOKEN|ID|WEBHOOK)" -- ":!*.test.js" ":!.github/**" ":!*.md"; then
             echo "Error: Payment credentials found in configuration!"
             exit 1
           fi
           # 5. Block active payment database tables or columns outside migrations
-          if git grep -i -E "\b(payment_status|payment_method|payment_id)\b|CREATE TABLE.*payments" -- ":!*migrations*" ":!*.test.js" ":!*.md"; then
+          if git grep -i -E "\b(payment_status|payment_method|payment_id)\b|CREATE TABLE.*payments" -- ":!*migrations*" ":!*.test.js" ":!.github/**" ":!*.md"; then
             echo "Error: Active payment database schema columns found!"
             exit 1
           fi
@@ -107,17 +124,19 @@ jobs:
           DB_USER: root
           DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
           DB_NAME: bylot_test
-          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
-          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
-          SESSION_SECRET: ci_test_super_secret_session_key_minimum_32_chars!
+          JWT_ACCESS_SECRET: ${{ env.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ env.JWT_REFRESH_SECRET }}
+          SESSION_SECRET: ${{ env.SESSION_SECRET }}
+          REPORT_ENCRYPTION_KEY: ${{ env.REPORT_ENCRYPTION_KEY }}
         run: npm test
 
       - name: Security audit script
         working-directory: backend
         env:
-          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
-          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
-          SESSION_SECRET: ci_test_super_secret_session_key_minimum_32_chars!
+          JWT_ACCESS_SECRET: ${{ env.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ env.JWT_REFRESH_SECRET }}
+          SESSION_SECRET: ${{ env.SESSION_SECRET }}
+          REPORT_ENCRYPTION_KEY: ${{ env.REPORT_ENCRYPTION_KEY }}
         run: npm run security-audit
 
       - name: Database backup & restore test
@@ -128,8 +147,9 @@ jobs:
           DB_USER: root
           DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
           DB_NAME: bylot_test
-          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
-          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
+          JWT_ACCESS_SECRET: ${{ env.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ env.JWT_REFRESH_SECRET }}
+          REPORT_ENCRYPTION_KEY: ${{ env.REPORT_ENCRYPTION_KEY }}
         run: npm run backup-test
 
       - name: Report archive & encryption verification
@@ -140,9 +160,9 @@ jobs:
           DB_USER: root
           DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
           DB_NAME: bylot_test
-          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
-          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
-          REPORT_ENCRYPTION_KEY: ci_test_super_secret_report_key_minimum_32_chars!
+          JWT_ACCESS_SECRET: ${{ env.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ env.JWT_REFRESH_SECRET }}
+          REPORT_ENCRYPTION_KEY: ${{ env.REPORT_ENCRYPTION_KEY }}
         run: npm run encryption-test
 
       - name: Load & stress benchmark test
@@ -153,9 +173,10 @@ jobs:
           DB_USER: root
           DB_PASSWORD: ${{ env.CI_MYSQL_PWD }}
           DB_NAME: bylot_test
-          JWT_ACCESS_SECRET: ci_test_super_secret_jwt_key_minimum_32_chars!
-          JWT_REFRESH_SECRET: ci_test_super_secret_refresh_jwt_key_min_32_chars!
-          SESSION_SECRET: ci_test_super_secret_session_key_minimum_32_chars!
+          JWT_ACCESS_SECRET: ${{ env.JWT_ACCESS_SECRET }}
+          JWT_REFRESH_SECRET: ${{ env.JWT_REFRESH_SECRET }}
+          SESSION_SECRET: ${{ env.SESSION_SECRET }}
+          REPORT_ENCRYPTION_KEY: ${{ env.REPORT_ENCRYPTION_KEY }}
         run: npm run stress-test
 
   frontend:

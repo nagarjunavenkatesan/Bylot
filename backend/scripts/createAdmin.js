@@ -31,23 +31,29 @@ async function main() {
   if (!email || !password) {
     throw new Error("Both ADMIN_EMAIL and ADMIN_PASSWORD are required to create an admin user.");
   }
-  if (password.length < 10) {
-    throw new Error("Admin password must be at least 10 characters long.");
+  if (password.length < 12) {
+    throw new Error("Admin password must be at least 12 characters long.");
   }
 
-  const BANNED_ADMIN_PASSWORDS = [
+  const GENERIC_BANNED_PATTERNS = [
     "admin",
     "password",
     "12345678",
     "adminpass",
-    "adminpass123",
-    "4014",
-    "bvnd",
-    "@bvnd4014bv",
-    "bvnd4014"
+    "changeme",
+    "qwerty",
+    "default"
   ];
-  if (BANNED_ADMIN_PASSWORDS.some(p => password.toLowerCase().includes(p))) {
-    throw new Error("[SECURITY] Insecure or known default admin password rejected. Choose a strong, unique passphrase.");
+  const lowerPwd = password.toLowerCase();
+  if (GENERIC_BANNED_PATTERNS.some(p => lowerPwd.includes(p))) {
+    throw new Error("[SECURITY] Insecure or common dictionary default admin password rejected. Choose a strong, unique passphrase.");
+  }
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasDigit = /\d/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  if (!(hasUpper && hasLower && hasDigit && hasSpecial)) {
+    throw new Error("Admin password must contain uppercase, lowercase, number, and special character.");
   }
 
   const passwordHash = await hashPassword(password);

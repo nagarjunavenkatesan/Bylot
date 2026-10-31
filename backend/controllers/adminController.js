@@ -5,6 +5,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { comparePassword } = require("../utils/password");
 const { getPagination, buildMeta } = require("../utils/pagination");
 const { findUserByEmail, findUserById } = require("../models/userModel");
+const { findProductById } = require("../models/productModel");
 const { issueTokens } = require("./authController");
 const { clearHotCache } = require("./productController");
 const { deleteUploadedFile } = require("../middleware/uploadMiddleware");
@@ -203,10 +204,124 @@ const updateProductStatus = asyncHandler(async (req, res) => {
 });
 
 const deleteProduct = asyncHandler(async (req, res) => {
+  const productId = req.params.id;
+  const product = await findProductById(productId, true);
+  if (!product) throw new AppError("Product not found", 404);
+
+  if (product.status === "deleted") {
+    throw new AppError("Product has already been deleted", 404);
+  }
+
+  const deletedAt = new Date();
+  const deletedBy = req.user.id;
+  const deletionReason = (req.body && req.body.reason) ? String(req.body.reason).trim().slice(0, 255) : "Admin deletion";
+
   // Soft delete preserves order history and avoids foreign key constraint failure
-  const [result] = await pool.execute("UPDATE products SET status = 'deleted' WHERE id = ?", [req.params.id]);
-  if (!result.affectedRows) throw new AppError("Product not found", 404);
-  return success(res, "Product deleted successfully", null);
+  await pool.execute(
+    "UPDATE products SET status = 'deleted', deleted_at = UTC_TIMESTAMP(), deleted_by = ?, deletion_reason = ? WHERE id = ?",
+    [deletedBy, deletionReason, productId]
+  );
+
+  clearHotCache();
+
+  auditLogger.logEvent("PRODUCT_DELETED", req, {
+    userId: req.user.id,
+    severity: "INFO",
+    details: {
+      action: "PRODUCT_DELETED",
+      productId: product.id,
+      productItemId: product.product_item_id || `PRD-${product.id}`,
+      productName: product.name,
+      sellerId: product.seller_id,
+      sellerName: product.seller_name,
+      deletedByUserId: req.user.id,
+      deletedByRole: req.user.role,
+      originalCreatedAt: product.created_at,
+      deletedAt: deletedAt.toISOString(),
+      deletionDate: deletedAt.toISOString().slice(0, 10),
+      deletionTime: deletedAt.toISOString().slice(11, 19),
+      deletionReason,
+      categoryName: product.category_name,
+      sellingPrice: product.selling_price,
+      mrp: product.mrp,
+      location: {
+        country: product.country || "India",
+        state: product.state,
+        district: product.district,
+        city: product.city,
+        locality: product.locality
+      },
+      imageUrl: product.image_url || null,
+      deletionResult: "SUCCESS"
+    }
+  });
+
+  return success(res, "Product deleted successfully", {
+    id: product.id,
+    product_item_id: product.product_item_id || `PRD-${product.id}`,
+    name: product.name,
+    status: "deleted",
+    deleted_at: deletedAt.toISOString(),
+    deleted_by: deletedBy
+  });
+});
+
+const getDeletedProducts = asyncHandler(async (req, res) => {
+  const { page, limit, offset } = getPagination(req.query);
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 100);
+  const safeOffset = Math.max(0, Number(offset) || 0);
+  const q = req.query.q ? req.query.q.trim() : "";
+
+  let whereClause = "WHERE p.status = 'deleted'";
+  let countParams = [];
+  let selectParams = [];
+
+  if (q) {
+    const escaped = q.replace(/[%_\\]/g, "\\$&");
+    const like = `%${escaped}%`;
+    whereClause += " AND (p.name LIKE ? OR p.product_item_id LIKE ?)";
+    countParams.push(like, like);
+    selectParams.push(like, like);
+  }
+
+  selectParams.push(safeLimit, safeOffset);
+
+  const [[count], [rows]] = await Promise.all([
+    pool.query(`SELECT COUNT(*) AS total FROM products p ${whereClause}`, countParams),
+    pool.query(
+      `SELECT p.id, p.product_item_id, p.name, p.selling_price, p.mrp, p.status,
+              p.country, p.state, p.district, p.city, p.locality,
+              p.created_at, p.updated_at, p.deleted_at, p.deleted_by, p.deletion_reason,
+              c.name AS category_name, s.business_name AS seller_name, s.contact_email AS seller_email,
+              del_u.name AS deleted_by_name, del_u.email AS deleted_by_email,
+              (
+                SELECT o.order_number 
+                FROM order_items oi 
+                JOIN orders o ON o.id = oi.order_id 
+                WHERE oi.product_id = p.id 
+                ORDER BY o.created_at DESC 
+                LIMIT 1
+              ) AS order_reference,
+              (
+                SELECT o.order_number 
+                FROM order_items oi 
+                JOIN orders o ON o.id = oi.order_id 
+                WHERE oi.product_id = p.id 
+                ORDER BY o.created_at DESC 
+                LIMIT 1
+              ) AS latest_order_number
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN sellers s ON s.id = p.seller_id
+       LEFT JOIN users del_u ON del_u.id = p.deleted_by
+       ${whereClause}
+       ORDER BY p.deleted_at DESC, p.id DESC
+       LIMIT ? OFFSET ?`,
+      selectParams
+    )
+  ]);
+
+  return success(res, "Deleted products fetched successfully", rows, 200, buildMeta(count[0].total, page, safeLimit));
 });
 
 // ── Expired Products Management ────────────────────────────────────────────
@@ -622,6 +737,19 @@ const verifyLogin2FA = asyncHandler(async (req, res) => {
   const secret = cryptoUtil.decryptPII(admin2fa.secret_encrypted);
   const result = twoFactorService.verifyTotp(secret, totpCode, admin2fa.last_used_time_step);
 
+  const secretDecryptedOk = Boolean(secret && secret !== "[DECRYPTION_ERROR]" && secret.length >= 16);
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const currentStep = Math.floor(Date.now() / 30000);
+
+  if (process.env.NODE_ENV !== "test") {
+    console.log(
+      `[2FA Diagnostic] verify-login: challengeId=${challengeId.slice(0, 8)}... ` +
+      `totpConfigLoaded=yes secretDecrypted=${secretDecryptedOk ? "yes" : "no"} ` +
+      `serverUnixTime=${currentTimestamp} timeStep=${currentStep} ` +
+      `verified=${result.valid ? "yes" : "no"} resultReason=${result.reason || "SUCCESS"}`
+    );
+  }
+
   if (!result.valid) {
     const failure = await twoFactorService.recordChallengeFailure(challengeId, req);
     auditLogger.logEvent("ADMIN_2FA_LOGIN_FAILED", req, {
@@ -667,6 +795,19 @@ const verifySetup2FA = asyncHandler(async (req, res) => {
 
   const tempSecret = cryptoUtil.decryptPII(challenge.temp_secret_encrypted);
   const result = twoFactorService.verifyTotp(tempSecret, totpCode);
+
+  const secretDecryptedOk = Boolean(tempSecret && tempSecret !== "[DECRYPTION_ERROR]" && tempSecret.length >= 16);
+  const currentTimestamp = Math.floor(Date.now() / 1000);
+  const currentStep = Math.floor(Date.now() / 30000);
+
+  if (process.env.NODE_ENV !== "test") {
+    console.log(
+      `[2FA Diagnostic] verify-setup: challengeId=${challengeId.slice(0, 8)}... ` +
+      `totpConfigLoaded=yes secretDecrypted=${secretDecryptedOk ? "yes" : "no"} ` +
+      `serverUnixTime=${currentTimestamp} timeStep=${currentStep} ` +
+      `verified=${result.valid ? "yes" : "no"} resultReason=${result.reason || "SUCCESS"}`
+    );
+  }
 
   if (!result.valid) {
     const failure = await twoFactorService.recordChallengeFailure(challengeId, req);
@@ -859,5 +1000,6 @@ module.exports = {
   districtAnalytics,
   getReports,
   resolveReport,
-  searchProductByItemId
+  searchProductByItemId,
+  getDeletedProducts
 };
