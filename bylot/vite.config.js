@@ -5,7 +5,7 @@ export default defineConfig(({ mode }) => {
   const backendTarget = env.VITE_BACKEND_TARGET || 'http://localhost:5000';
 
   return {
-    base: '/',
+    base: process.env.VITE_BASE_PATH || env.VITE_BASE_PATH || '/',
     server: {
       host: true,
       port: 5173,

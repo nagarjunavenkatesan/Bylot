@@ -48,7 +48,7 @@ function App() {
   };
 
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <LocationProvider>
         <Layout theme={theme} toggleTheme={toggleTheme}>
           <Suspense fallback={<Loader />}>
