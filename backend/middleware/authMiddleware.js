@@ -36,9 +36,15 @@ async function authenticate(req, res, next) {
     req.token = token;
     next();
   } catch (err) {
-    next(err.name === "JsonWebTokenError" || err.name === "TokenExpiredError"
-      ? new AppError("Session expired. Please sign in again.", 401)
-      : err);
+    if (
+      err.name === "JsonWebTokenError" ||
+      err.name === "TokenExpiredError" ||
+      err.name === "NotBeforeError" ||
+      err.name === "SyntaxError"
+    ) {
+      return next(new AppError("Session expired or invalid. Please sign in again.", 401));
+    }
+    next(err);
   }
 }
 

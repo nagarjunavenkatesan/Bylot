@@ -16,7 +16,7 @@ const Header = ({ theme, toggleTheme }) => {
 
     useEffect(() => {
         let cancelled = false;
-        if (user) {
+        if (user && (user.role === 'seller' || user.role === 'admin')) {
             apiRequest('/api/sellers/profile')
                 .then(res => {
                     if (!cancelled) setSellerApproved(res?.data?.approval_status === 'approved');
@@ -52,7 +52,12 @@ const Header = ({ theme, toggleTheme }) => {
             )}
             <div className="container header-content">
                 <div className="logo">
-                    <Link to="/" style={{ textDecoration: 'none' }}>
+                    <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <img
+                            src={`${import.meta.env.BASE_URL}favicon.svg`}
+                            alt="Bylot Eagle Logo"
+                            style={{ width: '32px', height: '32px', borderRadius: '8px', display: 'inline-block', flexShrink: 0 }}
+                        />
                         <h1>Bylot</h1>
                     </Link>
                 </div>

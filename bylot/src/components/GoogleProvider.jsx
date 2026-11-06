@@ -2,7 +2,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { apiRequest } from '../api/backendApi';
 
-const DEFAULT_CLIENT_ID = '358858464400-6di0qk18deq2fejn7g3f830i2g5fr1nf.apps.googleusercontent.com';
+const isProductionHost = typeof window !== 'undefined' && 
+  (window.location.hostname === 'bylot.in' || window.location.hostname.endsWith('.bylot.in'));
+const DEFAULT_CLIENT_ID = isProductionHost 
+  ? '358858464400-6di0qk18deq2fejn7g3f830i2g5fr1nf.apps.googleusercontent.com' 
+  : '';
 
 function isValidClientId(id) {
   if (!id || typeof id !== 'string') return false;

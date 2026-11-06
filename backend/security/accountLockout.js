@@ -35,8 +35,9 @@ class AccountLockoutManager {
       }
     }
 
-    // Check IP-level lockout
-    if (cleanIp && this.ipAttempts.has(cleanIp)) {
+    // Check IP-level lockout (exempt local loopback in non-production environments)
+    const isLoopback = cleanIp === "127.0.0.1" || cleanIp === "::1" || cleanIp === "::ffff:127.0.0.1" || cleanIp === "localhost";
+    if (cleanIp && (!isLoopback || process.env.NODE_ENV === "production") && this.ipAttempts.has(cleanIp)) {
       const ipRecord = this.ipAttempts.get(cleanIp);
       if (ipRecord.lockedUntil && now < ipRecord.lockedUntil) {
         const remainingSeconds = Math.ceil((ipRecord.lockedUntil - now) / 1000);

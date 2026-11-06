@@ -31,6 +31,10 @@ const Profile = () => {
     }, [user, authLoading, navigate]);
 
     const fetchMyItems = async () => {
+        if (!user || (user.role !== 'seller' && user.role !== 'admin')) {
+            setLoadingItems(false);
+            return;
+        }
         try {
             // First attempt to fetch via authenticated seller products endpoint
             try {

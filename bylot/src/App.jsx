@@ -42,6 +42,14 @@ function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('bylot-theme') || 'light');
 
   useEffect(() => {
+    // Ensure browser tab re-fetches and uses current eagle favicon
+    const icon = document.querySelector("link[rel*='icon']");
+    if (icon) {
+      icon.href = `${import.meta.env.BASE_URL}favicon.svg?v=eagle-2`;
+    }
+  }, []);
+
+  useEffect(() => {
     document.body.className = theme === 'dark' ? 'dark-mode' : '';
     localStorage.setItem('bylot-theme', theme);
   }, [theme]);
