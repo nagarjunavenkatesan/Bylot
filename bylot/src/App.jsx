@@ -22,6 +22,9 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 
 const Sell = lazy(() => import('./pages/Sell'));
 const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const Profile = lazy(() => import('./pages/Profile'));
 const EditItem = lazy(() => import('./pages/EditItem'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel'));
@@ -69,9 +72,9 @@ function App() {
 
               {/* Auth & Member Routes */}
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Navigate to="/login" replace />} />
-              <Route path="/reset-password" element={<Navigate to="/login" replace />} />
-              <Route path="/verify-email" element={<Navigate to="/login" replace />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/sell" element={<Sell />} />
               <Route path="/seller/orders" element={<SellerOrders />} />
               <Route path="/profile" element={<Profile />} />

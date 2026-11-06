@@ -126,13 +126,15 @@ const register = asyncHandler(async (req, res) => {
   const verificationTokenHash = hashToken(verificationToken);
   const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+  const isDevNoSmtp = env.nodeEnv === "development" && (!env.mail || !env.mail.host);
+
   const user = await createUser({
     name,
     email,
     phone,
     passwordHash,
     role: role === "seller" ? "seller" : "customer",
-    emailVerified: false,
+    emailVerified: isDevNoSmtp,
     verificationTokenHash,
     verificationExpiresAt
   });
@@ -145,7 +147,9 @@ const register = asyncHandler(async (req, res) => {
 
   return success(
     res,
-    "Registration successful. Please check your email to verify your account.",
+    isDevNoSmtp
+      ? "Registration successful! You can now sign in with your credentials."
+      : "Registration successful. Please check your email to verify your account.",
     { userId: user.id },
     201
   );

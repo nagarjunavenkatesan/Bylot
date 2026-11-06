@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import { GoogleLogin } from '@react-oauth/google';
 import PageTransition from '../components/PageTransition';
@@ -229,6 +229,20 @@ const Login = () => {
                             {loading ? 'Signing in...' : 'Sign In'}
                         </button>
                     </form>
+
+                    <div style={{ marginTop: '1.25rem', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                        <div>
+                            <Link to="/reset-password" style={{ color: 'var(--text-muted)', fontSize: '0.88rem', textDecoration: 'none' }}>
+                                Forgot your password?
+                            </Link>
+                        </div>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', margin: 0 }}>
+                            Don't have an account?{' '}
+                            <Link to="/register" style={{ color: 'var(--primary)', fontWeight: '700', textDecoration: 'none' }}>
+                                Create an Account
+                            </Link>
+                        </p>
+                    </div>
 
                     <div style={{
                         display: 'flex',
