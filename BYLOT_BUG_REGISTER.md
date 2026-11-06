@@ -80,3 +80,4 @@
 - **User Impact:** Local testing was blocked whenever brute-force test cases executed.
 - **Fix Implemented:** Added loopback exemption (`127.0.0.1`, `::1`) in non-production environments while preserving strict account-level email lockouts.
 - **Verification:** 30/30 auth test matrix executed and passed completely. PASS.
+

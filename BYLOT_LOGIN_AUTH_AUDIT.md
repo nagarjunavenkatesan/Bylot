@@ -79,3 +79,4 @@ Bylot utilizes an enterprise-grade, dual-token stateless/stateful authentication
 | Account Lockout | 5 consecutive failures | **PASS (Account Locked)** |
 | Lockout Counter Reset | Valid login resets counter | **PASS (Counter Reset)** |
 | CSRF Protection | Validates `X-Requested-With` | **PASS (403 without header)** |
+
