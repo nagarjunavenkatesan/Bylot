@@ -180,45 +180,59 @@ Services:
 
 ## 7. Production Domain & SSL (https://bylot.in)
 
-1. Point DNS A-records for `bylot.in` and `www.bylot.in` to your server's public IP address.
-2. Obtain a free TLS/SSL certificate using Let's Encrypt Certbot:
+1. Point DNS A-records for `bylot.in` and `www.bylot.in` to your VPS public IPv4 address in BigRock DNS Manager.
+2. Follow the comprehensive step-by-step [Deployment Guide](reports/DEPLOYMENT_GUIDE.md).
+3. Use the production Docker Compose configuration and automated deployment script:
    ```bash
-   sudo certbot certonly --standalone -d bylot.in -d www.bylot.in
+   # Deploy full stack with production overrides and healthchecks
+   ./scripts/deploy.sh
    ```
-3. Copy the production Nginx configuration:
+4. Verify all endpoints using the automated healthcheck:
    ```bash
-   sudo cp deploy/nginx/bylot.in.conf /etc/nginx/sites-available/bylot.in
-   sudo ln -s /etc/nginx/sites-available/bylot.in /etc/nginx/sites-enabled/
-   sudo nginx -t && sudo systemctl reload nginx
+   ./scripts/healthcheck.sh
    ```
-4. Start Docker Compose:
-   ```bash
-   docker compose up -d
-   ```
-   The site is now live at **https://bylot.in** with automated HTTPS redirection, HSTS, and secure reverse proxying.
 
 ---
 
 ## 8. Backup & Maintenance
 
-### Database Backup
+Automated production operations scripts are located in `scripts/`:
+
+### Automated Database Backup
 ```bash
-docker exec bylot-mysql mysqldump -u bylot_user -p bylot > backup_$(date +%F).sql
+./scripts/backup.sh
+# Creates timestamped, gzip-compressed, SHA-256 verified backup in /var/backups/bylot/
 ```
 
-### Database Restore
+### Automated Database Restore
 ```bash
-cat backup_YYYY-MM-DD.sql | docker exec -i bylot-mysql mysql -u bylot_user -p bylot
+./scripts/restore.sh /var/backups/bylot/bylot_db_<timestamp>.sql.gz
+# Automatically performs safety snapshot before restoration
 ```
 
-### Uploads Backup
-```bash
-docker run --rm -v bylot_uploads_data:/volume -v $(pwd):/backup alpine tar czf /backup/uploads_$(date +%F).tar.gz -C /volume .
-```
+### Uploads & Disaster Recovery
+For detailed disaster recovery, container crash loop recovery, and maintenance mode procedures, see [Rollback & Recovery Runbook](reports/ROLLBACK_AND_RECOVERY.md).
 
 ---
 
-## 9. Verification & Testing
+## 9. Comprehensive Production Audit Reports
+
+The repository includes 11 complete engineering audit reports in `reports/`:
+1. [Initial Production Audit](reports/PRODUCTION_INITIAL_AUDIT.md)
+2. [Production Readiness Report](reports/PRODUCTION_READINESS_REPORT.md)
+3. [Application Security Audit](reports/SECURITY_AUDIT.md)
+4. [API Architecture & Contract Audit](reports/API_AUDIT.md)
+5. [Database & Schema Integrity Audit](reports/DATABASE_AUDIT.md)
+6. [Search Engine Optimization (SEO) Audit](reports/SEO_AUDIT.md)
+7. [Core Web Vitals & Performance Report](reports/PERFORMANCE_REPORT.md)
+8. [Automated Test Execution Results](reports/TEST_RESULTS.md)
+9. [Ubuntu VPS & BigRock Deployment Guide](reports/DEPLOYMENT_GUIDE.md)
+10. [Production Environment Verification Checklist](reports/PRODUCTION_ENVIRONMENT_CHECKLIST.md)
+11. [Disaster Recovery & Rollback Runbook](reports/ROLLBACK_AND_RECOVERY.md)
+
+---
+
+## 10. Verification & Testing
 
 - **Backend Lint & Syntax:** `cd backend && npm run lint`
 - **Frontend Lint:** `cd bylot && npm run lint`
